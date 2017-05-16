@@ -590,3 +590,29 @@ func TestIsZeroWhenConfigHasValues(t *testing.T) {
 		}
 	}
 }
+
+func TestSortedGoString(t *testing.T) {
+	inputA := ecs.RegisterTaskDefinitionInput{
+		Family: aws.String("family1"),
+		ContainerDefinitions: []*ecs.ContainerDefinition{
+			{
+				Name: aws.String("foo"),
+				Command: aws.StringSlice([]string{"dark","side","of","the","moon"}),
+			},
+		},
+	}
+	inputB := ecs.RegisterTaskDefinitionInput{
+		ContainerDefinitions: []*ecs.ContainerDefinition{
+			{
+				Command: aws.StringSlice([]string{"dark","side","of","the","moon"}),
+				Name: aws.String("foo"),
+			},
+		},
+		Family: aws.String("family1"),
+	}
+
+	strA, _ := SortedGoString(inputA)
+	strB, _ := SortedGoString(inputB)
+
+	assert.Equal(t, strA, strB, "Same same, but different")
+}
