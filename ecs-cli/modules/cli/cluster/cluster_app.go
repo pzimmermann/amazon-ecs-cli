@@ -20,14 +20,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/container"
 	composecontext "github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/context"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/entity/task"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/cloudformation"
 	ec2client "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/ec2"
 	ecsclient "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/ecs"
-	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config/ami"
 	"github.com/aws/aws-sdk-go/aws"
@@ -42,77 +42,86 @@ var flagNamesToStackParameterKeys map[string]string
 
 func init() {
 	flagNamesToStackParameterKeys = map[string]string{
-		command.AsgMaxSizeFlag:    cloudformation.ParameterKeyAsgMaxSize,
-		command.VpcAzFlag:         cloudformation.ParameterKeyVPCAzs,
-		command.SecurityGroupFlag: cloudformation.ParameterKeySecurityGroup,
-		command.SourceCidrFlag:    cloudformation.ParameterKeySourceCidr,
-		command.EcsPortFlag:       cloudformation.ParameterKeyEcsPort,
-		command.SubnetIdsFlag:     cloudformation.ParameterKeySubnetIds,
-		command.VpcIdFlag:         cloudformation.ParameterKeyVpcId,
-		command.InstanceTypeFlag:  cloudformation.ParameterKeyInstanceType,
-		command.KeypairNameFlag:   cloudformation.ParameterKeyKeyPairName,
-		command.ImageIdFlag:       cloudformation.ParameterKeyAmiId,
+		flags.AsgMaxSizeFlag:    cloudformation.ParameterKeyAsgMaxSize,
+		flags.VpcAzFlag:         cloudformation.ParameterKeyVPCAzs,
+		flags.SecurityGroupFlag: cloudformation.ParameterKeySecurityGroup,
+		flags.SourceCidrFlag:    cloudformation.ParameterKeySourceCidr,
+		flags.EcsPortFlag:       cloudformation.ParameterKeyEcsPort,
+		flags.SubnetIdsFlag:     cloudformation.ParameterKeySubnetIds,
+		flags.VpcIdFlag:         cloudformation.ParameterKeyVpcId,
+		flags.InstanceTypeFlag:  cloudformation.ParameterKeyInstanceType,
+		flags.KeypairNameFlag:   cloudformation.ParameterKeyKeyPairName,
+		flags.ImageIdFlag:       cloudformation.ParameterKeyAmiId,
+		flags.InstanceRoleFlag:  cloudformation.ParameterKeyInstanceRole,
 	}
 }
 
 func ClusterUp(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'up': ", err)
-		return
+		logrus.Fatal("Error executing 'up': ", err)
 	}
 
 	ecsClient := ecsclient.NewECSClient()
 	cfnClient := cloudformation.NewCloudformationClient()
-	amiIds := ami.NewStaticAmiIds()
-	if err := createCluster(c, rdwr, ecsClient, cfnClient, amiIds); err != nil {
-		logrus.Error("Error executing 'up': ", err)
-		return
+
+	cliParams, err := newCliParams(c, rdwr)
+	if err != nil {
+		logrus.Fatal("Error executing 'up': ", err)
 	}
+
+	err = createCluster(c, ecsClient, cfnClient, cliParams)
+	if err != nil {
+		logrus.Fatal("Error executing 'up': ", err)
+	}
+
+	if !c.Bool(flags.EmptyFlag) {
+		// Displays resources create by CloudFormation, as a convenience for tasks launched
+		// with Task Networking or in Fargate mode.
+		if err := cfnClient.DescribeNetworkResources(cliParams.CFNStackName); err != nil {
+			logrus.Error("Error describing Cloudformation resources: ", err)
+		}
+	}
+
+	fmt.Println("Cluster creation succeeded.")
 }
 
 func ClusterDown(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'down': ", err)
-		return
+		logrus.Fatal("Error executing 'down': ", err)
 	}
 
 	ecsClient := ecsclient.NewECSClient()
 	cfnClient := cloudformation.NewCloudformationClient()
 	if err := deleteCluster(c, rdwr, ecsClient, cfnClient); err != nil {
-		logrus.Error("Error executing 'down': ", err)
-		return
+		logrus.Fatal("Error executing 'down': ", err)
 	}
 }
 
 func ClusterScale(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'scale': ", err)
-		return
+		logrus.Fatal("Error executing 'scale': ", err)
 	}
 
 	ecsClient := ecsclient.NewECSClient()
 	cfnClient := cloudformation.NewCloudformationClient()
 	if err := scaleCluster(c, rdwr, ecsClient, cfnClient); err != nil {
-		logrus.Error("Error executing 'scale': ", err)
-		return
+		logrus.Fatal("Error executing 'scale': ", err)
 	}
 }
 
 func ClusterPS(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'ps ", err)
-		return
+		logrus.Fatal("Error executing 'ps ", err)
 	}
 
 	ecsClient := ecsclient.NewECSClient()
 	infoSet, err := clusterPS(c, rdwr, ecsClient)
 	if err != nil {
-		logrus.Error("Error executing 'ps ", err)
-		return
+		logrus.Fatal("Error executing 'ps ", err)
 	}
 	os.Stdout.WriteString(infoSet.String(container.ContainerInfoColumns, displayTitle))
 }
@@ -150,83 +159,96 @@ func validateCommaSeparatedParam(cfnParams *cloudformation.CfnStackParams, param
 	return false
 }
 
-func createCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecsclient.ECSClient, cfnClient cloudformation.CloudformationClient, amiIds ami.ECSAmiIds) error {
-	// Validate cli flags
-	if !isIAMAcknowledged(context) {
-		return fmt.Errorf("Please acknowledge that this command may create IAM resources with the '--%s' flag", command.CapabilityIAMFlag)
+func createCluster(context *cli.Context, ecsClient ecsclient.ECSClient, cfnClient cloudformation.CloudformationClient, cliParams *config.CLIParams) error {
+	var err error
+
+	if context.Bool(flags.EmptyFlag) {
+		err = createEmptyCluster(context, ecsClient, cfnClient, cliParams)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-	ecsParams, err := newCliParams(context, rdwr)
-	if err != nil {
-		return err
+
+	launchType := cliParams.LaunchType
+	if launchType == "" {
+		launchType = config.LaunchTypeDefault
+	}
+
+	// InstanceRole not needed when creating empty cluster for Fargate tasks
+	if launchType == config.LaunchTypeEC2 {
+		if err := validateInstanceRole(context); err != nil {
+			return err
+		}
+		// Display warning if keypair not specified
+		if context.String(flags.KeypairNameFlag) == "" {
+			logrus.Warn("You will not be able to SSH into your EC2 instances without a key pair.")
+		}
+
 	}
 
 	// Check if cluster is specified
-	if ecsParams.Cluster == "" {
-		return fmt.Errorf("Please configure a cluster using the configure command.")
+	if cliParams.Cluster == "" {
+		return fmt.Errorf("Please configure a cluster using the configure command or the '--%s' flag", flags.ClusterFlag)
 	}
 
 	// Check if cfn stack already exists
-	cfnClient.Initialize(ecsParams)
-	stackName := ecsParams.GetCfnStackName()
+	cfnClient.Initialize(cliParams)
+	stackName := cliParams.CFNStackName
 	var deleteStack bool
-	if err := cfnClient.ValidateStackExists(stackName); err == nil {
+	if err = cfnClient.ValidateStackExists(stackName); err == nil {
 		if !isForceSet(context) {
-			return fmt.Errorf("A CloudFormation stack already exists for the cluster '%s'. Please specify '--%s' to clean up your existing resources.", ecsParams.Cluster, command.ForceFlag)
+			return fmt.Errorf("A CloudFormation stack already exists for the cluster '%s'. Please specify '--%s' to clean up your existing resources", cliParams.Cluster, flags.ForceFlag)
 		}
 		deleteStack = true
 	}
 
 	// Populate cfn params
 	cfnParams := cliFlagsToCfnStackParams(context)
-	cfnParams.Add(cloudformation.ParameterKeyCluster, ecsParams.Cluster)
+	cfnParams.Add(cloudformation.ParameterKeyCluster, cliParams.Cluster)
+	if context.Bool(flags.NoAutoAssignPublicIPAddressFlag) {
+		cfnParams.Add(cloudformation.ParameterKeyAssociatePublicIPAddress, "false")
+	}
 
-	// Check if key pair exists
-	_, err = cfnParams.GetParameter(cloudformation.ParameterKeyKeyPairName)
-	if err == cloudformation.ParameterNotFoundError {
-		return fmt.Errorf("Please specify the keypair name with '--%s' flag", command.KeypairNameFlag)
-	} else if err != nil {
-		return err
+	if launchType == config.LaunchTypeFargate {
+		cfnParams.Add(cloudformation.ParameterKeyIsFargate, "true")
 	}
 
 	// Check if vpc and AZs are not both specified.
 	if validateMutuallyExclusiveParams(cfnParams, cloudformation.ParameterKeyVPCAzs, cloudformation.ParameterKeyVpcId) {
-		return fmt.Errorf("You can only specify '--%s' or '--%s'", command.VpcIdFlag, command.VpcAzFlag)
+		return fmt.Errorf("You can only specify '--%s' or '--%s'", flags.VpcIdFlag, flags.VpcAzFlag)
 	}
 
 	// Check if 2 AZs are specified
 	if validateCommaSeparatedParam(cfnParams, cloudformation.ParameterKeyVPCAzs, 2, 2) {
-		return fmt.Errorf("You must specify 2 comma-separated availability zones with the '--%s' flag", command.VpcAzFlag)
+		return fmt.Errorf("You must specify 2 comma-separated availability zones with the '--%s' flag", flags.VpcAzFlag)
+	}
+
+	// Check if more than one custom instance role is specified
+	if validateCommaSeparatedParam(cfnParams, cloudformation.ParameterKeyInstanceRole, 1, 1) {
+		return fmt.Errorf("You can only specify one instance role name with the '--%s' flag", flags.InstanceRoleFlag)
 	}
 
 	// Check if vpc exists when security group is specified
 	if validateDependentParams(cfnParams, cloudformation.ParameterKeySecurityGroup, cloudformation.ParameterKeyVpcId) {
-		return fmt.Errorf("You have selected a security group. Please specify a VPC with the '--%s' flag", command.VpcIdFlag)
-	}
-
-	// Check only one security group is specified
-	if validateCommaSeparatedParam(cfnParams, cloudformation.ParameterKeySecurityGroup, 1, 1) {
-		return fmt.Errorf("You can only specify one security group with the '--%s' flag", command.SecurityGroupFlag)
+		return fmt.Errorf("You have selected a security group. Please specify a VPC with the '--%s' flag", flags.VpcIdFlag)
 	}
 
 	// Check if subnets exists when vpc is specified
 	if validateDependentParams(cfnParams, cloudformation.ParameterKeyVpcId, cloudformation.ParameterKeySubnetIds) {
-		return fmt.Errorf("You have selected a VPC. Please specify 2 comma-separated subnets with the '--%s' flag", command.SubnetIdsFlag)
+		return fmt.Errorf("You have selected a VPC. Please specify 2 comma-separated subnets with the '--%s' flag", flags.SubnetIdsFlag)
 	}
 
 	// Check if vpc exists when subnets is specified
 	if validateDependentParams(cfnParams, cloudformation.ParameterKeySubnetIds, cloudformation.ParameterKeyVpcId) {
-		return fmt.Errorf("You have selected subnets. Please specify a VPC with the '--%s' flag", command.VpcIdFlag)
-	}
-
-	// Check if 2 subnets are specified
-	if validateCommaSeparatedParam(cfnParams, cloudformation.ParameterKeySubnetIds, 2, 2) {
-		return fmt.Errorf("You must specify 2 comma-separated subnets with the '--%s' flag", command.SubnetIdsFlag)
+		return fmt.Errorf("You have selected subnets. Please specify a VPC with the '--%s' flag", flags.VpcIdFlag)
 	}
 
 	// Check if image id was supplied, else populate
+	amiIds := ami.NewStaticAmiIds()
 	_, err = cfnParams.GetParameter(cloudformation.ParameterKeyAmiId)
 	if err == cloudformation.ParameterNotFoundError {
-		amiId, err := amiIds.Get(aws.StringValue(ecsParams.Session.Config.Region))
+		amiId, err := amiIds.Get(aws.StringValue(cliParams.Session.Config.Region))
 		if err != nil {
 			return err
 		}
@@ -239,8 +261,8 @@ func createCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscl
 	}
 
 	// Create ECS cluster
-	ecsClient.Initialize(ecsParams)
-	if _, err := ecsClient.CreateCluster(ecsParams.Cluster); err != nil {
+	ecsClient.Initialize(cliParams)
+	if _, err := ecsClient.CreateCluster(cliParams.Cluster); err != nil {
 		return err
 	}
 
@@ -257,6 +279,7 @@ func createCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscl
 
 	// Create cfn stack
 	template := cloudformation.GetTemplate()
+
 	if _, err := cfnClient.CreateStack(template, stackName, cfnParams); err != nil {
 		return err
 	}
@@ -266,8 +289,55 @@ func createCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscl
 	return cfnClient.WaitUntilCreateComplete(stackName)
 }
 
-var newCliParams = func(context *cli.Context, rdwr config.ReadWriter) (*config.CliParams, error) {
-	return config.NewCliParams(context, rdwr)
+var newCliParams = func(context *cli.Context, rdwr config.ReadWriter) (*config.CLIParams, error) {
+	return config.NewCLIParams(context, rdwr)
+}
+
+func createEmptyCluster(context *cli.Context, ecsClient ecsclient.ECSClient, cfnClient cloudformation.CloudformationClient, cliParams *config.CLIParams) error {
+	for _, flag := range flags.CFNResourceFlags() {
+		if context.String(flag) != "" {
+			logrus.Warnf("Value for flag '%v' will be ignored when creating an empty cluster", flag)
+		}
+	}
+	if isIAMAcknowledged(context) {
+		logrus.Warnf("The '--%v' flag will be ignored when creating an empty cluster", flags.CapabilityIAMFlag)
+	}
+
+	if isForceSet(context) {
+		logrus.Warn("Force flag is unsupported when creating an empty cluster.")
+	}
+
+	if cliParams.Cluster == "" {
+		return fmt.Errorf("Please configure a cluster using the configure command or the '--%s' flag", flags.ClusterFlag)
+	}
+
+	// Check if non-empty cluster with same name already exists
+	cfnClient.Initialize(cliParams)
+	stackName := cliParams.CFNStackName
+	if err := cfnClient.ValidateStackExists(stackName); err == nil {
+		return fmt.Errorf("A CloudFormation stack already exists for the cluster '%s'.", cliParams.Cluster)
+	}
+
+	ecsClient.Initialize(cliParams)
+	if _, err := ecsClient.CreateCluster(cliParams.Cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var deleteCFNStack = func(cfnClient cloudformation.CloudformationClient, cliParams *config.CLIParams) error {
+	stackName := cliParams.CFNStackName
+	if err := cfnClient.DeleteStack(stackName); err != nil {
+		return err
+	}
+
+	logrus.Info("Waiting for your cluster resources to be deleted...")
+	if err := cfnClient.WaitUntilDeleteComplete(stackName); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func deleteCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecsclient.ECSClient, cfnClient cloudformation.CloudformationClient) error {
@@ -278,35 +348,32 @@ func deleteCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscl
 			return err
 		}
 	}
-	ecsParams, err := newCliParams(context, rdwr)
+
+	cliParams, err := newCliParams(context, rdwr)
 	if err != nil {
 		return err
 	}
 
 	// Validate that cluster exists in ECS
-	ecsClient.Initialize(ecsParams)
-	if err := validateCluster(ecsParams.Cluster, ecsClient); err != nil {
+	ecsClient.Initialize(cliParams)
+	if err := validateCluster(cliParams.Cluster, ecsClient); err != nil {
 		return err
 	}
 
 	// Validate that a cfn stack exists for the cluster
-	cfnClient.Initialize(ecsParams)
-	stackName := ecsParams.GetCfnStackName()
-	if err := cfnClient.ValidateStackExists(stackName); err != nil {
-		return fmt.Errorf("CloudFormation stack not found for cluster '%s'", ecsParams.Cluster)
-	}
+	cfnClient.Initialize(cliParams)
+	stackName := cliParams.CFNStackName
 
-	// Delete cfn stack
-	if err := cfnClient.DeleteStack(stackName); err != nil {
-		return err
-	}
-	logrus.Info("Waiting for your cluster resources to be deleted...")
-	if err := cfnClient.WaitUntilDeleteComplete(stackName); err != nil {
-		return err
+	if err := cfnClient.ValidateStackExists(stackName); err != nil {
+		logrus.Infof("No CloudFormation stack found for cluster '%s'.", cliParams.Cluster)
+	} else {
+		if err := deleteCFNStack(cfnClient, cliParams); err != nil {
+			return err
+		}
 	}
 
 	// Delete cluster in ECS
-	if _, err := ecsClient.DeleteCluster(ecsParams.Cluster); err != nil {
+	if _, err := ecsClient.DeleteCluster(cliParams.Cluster); err != nil {
 		return err
 	}
 
@@ -317,7 +384,7 @@ func deleteCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscl
 func scaleCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecsclient.ECSClient, cfnClient cloudformation.CloudformationClient) error {
 	// Validate cli flags
 	if !isIAMAcknowledged(context) {
-		return fmt.Errorf("Please acknowledge that this command may create IAM resources with the '--%s' flag", command.CapabilityIAMFlag)
+		return fmt.Errorf("Please acknowledge that this command may create IAM resources with the '--%s' flag", flags.CapabilityIAMFlag)
 	}
 
 	size, err := getClusterSize(context)
@@ -325,29 +392,33 @@ func scaleCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscli
 		return err
 	}
 	if size == "" {
-		return fmt.Errorf("Missing required flag '--%s'", command.AsgMaxSizeFlag)
+		return fmt.Errorf("Missing required flag '--%s'", flags.AsgMaxSizeFlag)
 	}
 
-	ecsParams, err := newCliParams(context, rdwr)
+	cliParams, err := newCliParams(context, rdwr)
 	if err != nil {
 		return err
 	}
 
 	// Validate that cluster exists in ECS
-	ecsClient.Initialize(ecsParams)
-	if err := validateCluster(ecsParams.Cluster, ecsClient); err != nil {
+	ecsClient.Initialize(cliParams)
+	if err := validateCluster(cliParams.Cluster, ecsClient); err != nil {
 		return err
 	}
 
 	// Validate that we have a cfn stack for the cluster
-	cfnClient.Initialize(ecsParams)
-	stackName := ecsParams.GetCfnStackName()
-	if err := cfnClient.ValidateStackExists(stackName); err != nil {
-		return fmt.Errorf("CloudFormation stack not found for cluster '%s'", ecsParams.Cluster)
+	cfnClient.Initialize(cliParams)
+	stackName := cliParams.CFNStackName
+	existingParameters, err := cfnClient.GetStackParameters(stackName)
+	if err != nil {
+		return fmt.Errorf("CloudFormation stack not found for cluster '%s'", cliParams.Cluster)
 	}
 
 	// Populate update params for the cfn stack
-	cfnParams := cloudformation.NewCfnStackParamsForUpdate()
+	cfnParams, err := cloudformation.NewCfnStackParamsForUpdate(existingParameters)
+	if err != nil {
+		return err
+	}
 	cfnParams.Add(cloudformation.ParameterKeyAsgMaxSize, size)
 
 	// Update the stack.
@@ -360,17 +431,17 @@ func scaleCluster(context *cli.Context, rdwr config.ReadWriter, ecsClient ecscli
 }
 
 func clusterPS(context *cli.Context, rdwr config.ReadWriter, ecsClient ecsclient.ECSClient) (project.InfoSet, error) {
-	ecsParams, err := newCliParams(context, rdwr)
+	cliParams, err := newCliParams(context, rdwr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate that cluster exists in ECS
-	ecsClient.Initialize(ecsParams)
-	if err := validateCluster(ecsParams.Cluster, ecsClient); err != nil {
+	ecsClient.Initialize(cliParams)
+	if err := validateCluster(cliParams.Cluster, ecsClient); err != nil {
 		return nil, err
 	}
-	ec2Client := ec2client.NewEC2Client(ecsParams)
+	ec2Client := ec2client.NewEC2Client(cliParams)
 
 	ecsContext := &composecontext.Context{ECSClient: ecsClient, EC2Client: ec2Client}
 	task := task.NewTask(ecsContext)
@@ -399,7 +470,7 @@ func deleteClusterPrompt(reader *bufio.Reader) error {
 	}
 	formattedInput := strings.ToLower(strings.TrimSpace(input))
 	if formattedInput != "yes" && formattedInput != "y" {
-		return fmt.Errorf("Aborted cluster deletion. To delete your cluster, re-run this command and specify the '--%s' flag or confirm that you'd like to delete your cluster at the prompt.", command.ForceFlag)
+		return fmt.Errorf("Aborted cluster deletion. To delete your cluster, re-run this command and specify the '--%s' flag or confirm that you'd like to delete your cluster at the prompt.", flags.ForceFlag)
 	}
 	return nil
 }
@@ -417,19 +488,37 @@ func cliFlagsToCfnStackParams(context *cli.Context) *cloudformation.CfnStackPara
 	return cfnParams
 }
 
-// isIAMAcknowledged returrns true if the 'capability-iam' flag is set from CLI.
+// isIAMAcknowledged returns true if the 'capability-iam' flag is set from CLI.
 func isIAMAcknowledged(context *cli.Context) bool {
-	return context.Bool(command.CapabilityIAMFlag)
+	return context.Bool(flags.CapabilityIAMFlag)
+}
+
+// returns true if customer specifies a custom instance role via 'role' flag.
+func hasCustomRole(context *cli.Context) bool {
+	return context.String(flags.InstanceRoleFlag) != "" // validate arn?
+}
+
+func validateInstanceRole(context *cli.Context) error {
+	defaultRole := isIAMAcknowledged(context)
+	customRole := hasCustomRole(context)
+
+	if !defaultRole && !customRole {
+		return fmt.Errorf("You must either specify a custom role with the '--%s' flag or set the '--%s' flag", flags.InstanceRoleFlag, flags.CapabilityIAMFlag)
+	}
+	if defaultRole && customRole {
+		return fmt.Errorf("Cannot specify custom role when '--%s' flag is set", flags.CapabilityIAMFlag)
+	}
+	return nil
 }
 
 // isForceSet returns true if the 'force' flag is set from CLI.
 func isForceSet(context *cli.Context) bool {
-	return context.Bool(command.ForceFlag)
+	return context.Bool(flags.ForceFlag)
 }
 
 // getClusterSize gets the value for the 'size' flag from CLI.
 func getClusterSize(context *cli.Context) (string, error) {
-	size := context.String(command.AsgMaxSizeFlag)
+	size := context.String(flags.AsgMaxSizeFlag)
 	if size != "" {
 		if _, err := strconv.Atoi(size); err != nil {
 			return "", err

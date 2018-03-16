@@ -4,7 +4,7 @@
 // not use this file except in compliance with the License. A copy of the
 // License is located at
 //
-//	http://aws.amazon.com/apache2.0/
+//  http://aws.amazon.com/apache2.0/
 //
 // or in the "license" file accompanying this file. This file is distributed
 // on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
@@ -22,6 +22,16 @@ func GetTemplate() string {
 // 2. Auto detect existing key pairs
 // 3. Create key pair when none exist
 // 4. Remove the hardcoded 2 subnets creation
+
+// These are used to display CFN resources in the CreateCluster callback.
+// TODO: Find better way to use constants in template string itself.
+const (
+	Subnet1LogicalResourceId       = "PubSubnetAz1"
+	Subnet2LogicalResourceId       = "PubSubnetAz2"
+	VPCLogicalResourceId           = "Vpc"
+	SecurityGroupLogicalResourceId = "EcsSecurityGroup"
+)
+
 var template = `
 {
   "AWSTemplateFormatVersion": "2010-09-09",
@@ -49,6 +59,8 @@ var template = `
         "t2.small",
         "t2.medium",
         "t2.large",
+        "t2.xlarge",
+        "t2.2xlarge",
         "m3.medium",
         "m3.large",
         "m3.xlarge",
@@ -58,6 +70,19 @@ var template = `
         "m4.2xlarge",
         "m4.4xlarge",
         "m4.10xlarge",
+        "m4.16xlarge",
+        "m5.large",
+        "m5.xlarge",
+        "m5.2xlarge",
+        "m5.4xlarge",
+        "m5.12xlarge",
+        "m5.24xlarge",
+        "c5.large",
+        "c5.xlarge",
+        "c5.2xlarge",
+        "c5.4xlarge",
+        "c5.9xlarge",
+        "c5.18xlarge",
         "c4.large",
         "c4.xlarge",
         "c4.2xlarge",
@@ -79,21 +104,50 @@ var template = `
         "r4.4xlarge",
         "r4.8xlarge",
         "r4.16xlarge",
+        "x1.16xlarge",
+        "x1.32xlarge",
+        "x1e.xlarge",
+        "x1e.2xlarge",
+        "x1e.4xlarge",
+        "x1e.8xlarge",
+        "x1e.16xlarge",
+        "x1e.32xlarge",
+        "d2.xlarge",
+        "d2.2xlarge",
+        "d2.4xlarge",
+        "d2.8xlarge",
+        "h1.2xlarge",
+        "h1.4xlarge",
+        "h1.8xlarge",
+        "h1.16xlarge",
         "i2.xlarge",
         "i2.2xlarge",
         "i2.4xlarge",
         "i2.8xlarge",
+        "i3.large",
+        "i3.xlarge",
+        "i3.2xlarge",
+        "i3.4xlarge",
+        "i3.8xlarge",
+        "i3.16xlarge",
+        "f1.2xlarge",
+        "f2.16xlarge",
         "g2.2xlarge",
         "g2.8xlarge",
-        "d2.xlarge",
-        "d2.2xlarge",
-        "d2.4xlarge",
-        "d2.8xlarge"
+        "g3.4xlarge",
+        "g3.8xlarge",
+        "g3.16xlarge",
+        "p2.xlarge",
+        "p2.8xlarge",
+        "p2.16xlarge",
+        "p3.2xlarge",
+        "p3.8xlarge",
+        "p3.16xlarge"
       ],
       "ConstraintDescription": "must be a valid EC2 instance type."
     },
     "KeyName": {
-      "Type": "AWS::EC2::KeyPair::KeyName",
+      "Type": "String",
       "Description": "Optional - Name of an existing EC2 KeyPair to enable SSH access to the ECS instances",
       "Default": ""
     },
@@ -101,8 +155,8 @@ var template = `
       "Type": "String",
       "Description": "Optional - VPC Id of existing VPC. Leave blank to have a new VPC created",
       "Default": "",
-      "AllowedPattern": "^(?:vpc-[0-9a-f]{8}|)$",
-      "ConstraintDescription": "VPC Id must begin with 'vpc-' or leave blank to have a new VPC created"
+      "AllowedPattern": "^(?:vpc-[0-9a-f]{8}|vpc-[0-9a-f]{17}|)$",
+      "ConstraintDescription": "VPC Id must begin with 'vpc-' followed by either an 8 or 17 character identifier, or leave blank to have a new VPC created"
     },
     "SubnetIds": {
       "Type": "CommaDelimitedList",
@@ -114,8 +168,8 @@ var template = `
       "Description": "Maximum size and initial Desired Capacity of ECS Auto Scaling Group",
       "Default": "1"
     },
-    "SecurityGroup": {
-      "Type": "String",
+    "SecurityGroupIds": {
+      "Type": "CommaDelimitedList",
       "Description": "Optional - Existing security group to associate the container instances. Creates one by default.",
       "Default": ""
     },
@@ -134,13 +188,34 @@ var template = `
       "Description": "Optional - Comma-delimited list of VPC availability zones in which to create subnets.  Required if setting VpcId.",
       "Default": ""
     },
+    "AssociatePublicIpAddress": {
+      "Type": "String",
+      "Description": "Optional - Automatically assign public IP addresses to new instances in this VPC.",
+      "Default": "true"
+    },
     "EcsCluster" : {
       "Type" : "String",
       "Description" : "ECS Cluster Name",
       "Default" : "default"
+    },
+    "InstanceRole" : {
+      "Type" : "String",
+      "Description" : "Optional - Instance IAM Role.",
+      "Default" : ""
+    },
+    "IsFargate": {
+      "Type": "String",
+      "Description": "Optional - Whether to create resources only for running Fargate tasks.",
+      "Default": "false"
     }
   },
   "Conditions": {
+    "IsCNRegion": {
+      "Fn::Equals": [ { "Ref": "AWS::Region" }, "cn-north-1" ]
+    },
+    "LaunchInstances": {
+      "Fn::Equals": [ { "Ref": "IsFargate" }, "false" ]
+    },
     "CreateVpcResources": {
       "Fn::Equals": [
         {
@@ -150,31 +225,42 @@ var template = `
       ]
     },
     "CreateSecurityGroup": {
-      "Fn::Equals": [
+      "Fn::And":[
         {
-          "Ref": "SecurityGroup"
+          "Condition": "LaunchInstances"
         },
-        ""
-      ]
-    },
-    "CreateEC2LCWithKeyPair": {
-      "Fn::Not": [
         {
           "Fn::Equals": [
             {
-              "Ref": "KeyName"
+              "Fn::Join": [
+                "",
+                {
+                  "Ref": "SecurityGroupIds"
+                }
+              ]
             },
             ""
           ]
         }
       ]
     },
-    "CreateEC2LCWithoutKeyPair": {
-      "Fn::Equals": [
+    "CreateEC2LCWithKeyPair": {
+      "Fn::And":[
         {
-          "Ref": "KeyName"
+          "Condition": "LaunchInstances"
         },
-        ""
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "KeyName"
+                },
+                ""
+              ]
+            }
+          ]
+        }
       ]
     },
     "UseSpecifiedVpcAvailabilityZones": {
@@ -188,6 +274,21 @@ var template = `
                   "Ref": "VpcAvailabilityZones"
                 }
               ]
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "CreateEcsInstanceRole": {
+      "Fn::And":[
+        {
+          "Condition": "LaunchInstances"
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "InstanceRole"
             },
             ""
           ]
@@ -358,11 +459,12 @@ var template = `
             "IpProtocol" : "tcp",
             "FromPort" : { "Ref" : "EcsPort" },
             "ToPort" : { "Ref" : "EcsPort" },
-            "CidrIp" : { "Ref" : "SourceCidr" } 
+            "CidrIp" : { "Ref" : "SourceCidr" }
         } ]
       }
     },
-    "EcsInstancePolicy": {
+    "EcsInstanceRole": {
+      "Condition": "CreateEcsInstanceRole",
       "Type": "AWS::IAM::Role",
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -372,7 +474,11 @@ var template = `
               "Effect": "Allow",
               "Principal": {
                 "Service": [
-                  "ec2.amazonaws.com"
+                  "Fn::If": [
+                    "IsCNRegion",
+                    "ec2.amazonaws.com.cn",
+                    "ec2.amazonaws.com"
+                  ]
                 ]
               },
               "Action": [
@@ -388,80 +494,57 @@ var template = `
       }
     },
     "EcsInstanceProfile": {
+      "Condition": "LaunchInstances",
       "Type": "AWS::IAM::InstanceProfile",
       "Properties": {
         "Path": "/",
         "Roles": [
-          {
-            "Ref": "EcsInstancePolicy"
-          }
+          "Fn::If": [
+            "CreateEcsInstanceRole",
+            {
+              "Ref": "EcsInstanceRole"
+            },
+            {
+              "Ref": "InstanceRole"
+            }
+          ]
         ]
       }
     },
     "EcsInstanceLc": {
-      "Condition": "CreateEC2LCWithKeyPair",
+      "Condition": "LaunchInstances",
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-	"ImageId": { "Ref" : "EcsAmiId" },
+        "ImageId": { "Ref" : "EcsAmiId" },
         "InstanceType": {
           "Ref": "EcsInstanceType"
         },
-        "AssociatePublicIpAddress": true,
+        "AssociatePublicIpAddress": {
+          "Ref": "AssociatePublicIpAddress"
+        },
         "IamInstanceProfile": {
           "Ref": "EcsInstanceProfile"
         },
         "KeyName": {
-          "Ref": "KeyName"
-        },
-        "SecurityGroups": {
           "Fn::If": [
-            "CreateSecurityGroup",
-            [ {
-              "Ref": "EcsSecurityGroup"
-            } ],
-            [ {
-              "Ref": "SecurityGroup"
-            } ]
+            "CreateEC2LCWithKeyPair",
+            {
+              "Ref": "KeyName"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
           ]
         },
-        "UserData": {
-          "Fn::Base64": {
-            "Fn::Join": [
-              "",
-              [
-                "#!/bin/bash\n",
-                "echo ECS_CLUSTER=",
-                {
-                  "Ref": "EcsCluster"
-                },
-                " >> /etc/ecs/ecs.config\n"
-              ]
-            ]
-          }
-        }
-      }
-    },
-    "EcsInstanceLcWithoutKeyPair": {
-      "Condition": "CreateEC2LCWithoutKeyPair",
-      "Type": "AWS::AutoScaling::LaunchConfiguration",
-      "Properties": {
-	"ImageId": { "Ref" : "EcsAmiId" },
-        "InstanceType": {
-          "Ref": "EcsInstanceType"
-        },
-        "AssociatePublicIpAddress": true,
-        "IamInstanceProfile": {
-          "Ref": "EcsInstanceProfile"
-        },
         "SecurityGroups": {
           "Fn::If": [
             "CreateSecurityGroup",
             [ {
               "Ref": "EcsSecurityGroup"
             } ],
-            [ {
-              "Ref": "SecurityGroup"
-            } ]
+            {
+              "Ref": "SecurityGroupIds"
+            }
           ]
         },
         "UserData": {
@@ -482,6 +565,7 @@ var template = `
       }
     },
     "EcsInstanceAsg": {
+      "Condition": "LaunchInstances",
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "VPCZoneIdentifier": {
@@ -508,17 +592,9 @@ var template = `
           ]
         },
         "LaunchConfigurationName": {
-          "Fn::If": [
-            "CreateEC2LCWithKeyPair",
-            {
-              "Ref": "EcsInstanceLc"
-            },
-            {
-              "Ref": "EcsInstanceLcWithoutKeyPair"
-            }
-          ]
+          "Ref": "EcsInstanceLc"
         },
-        "MinSize": "1",
+        "MinSize": "0",
         "MaxSize": {
           "Ref": "AsgMaxSize"
         },

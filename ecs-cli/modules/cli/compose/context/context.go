@@ -19,11 +19,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	ec2client "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/ec2"
 	ecsclient "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/ecs"
-	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils/compose"
 	"github.com/docker/libcompose/project"
 	"github.com/urfave/cli"
 )
@@ -33,7 +34,9 @@ type Context struct {
 	project.Context
 
 	CLIContext *cli.Context
-	ECSParams  *config.CliParams
+	CLIParams  *config.CLIParams
+	// NOTE: Ideally, would like to only store the non-TaskDef related fields here (e.g. "DeploymentConfig")
+	ECSParams *utils.ECSParams
 
 	// AWS Service Clients
 	ECSClient ecsclient.ECSClient
@@ -47,9 +50,9 @@ type Context struct {
 func (context *Context) Open() error {
 	// setup aws service clients
 	context.ECSClient = ecsclient.NewECSClient()
-	context.ECSClient.Initialize(context.ECSParams)
+	context.ECSClient.Initialize(context.CLIParams)
 
-	context.EC2Client = ec2client.NewEC2Client(context.ECSParams)
+	context.EC2Client = ec2client.NewEC2Client(context.CLIParams)
 
 	return nil
 }
@@ -59,7 +62,7 @@ func (context *Context) Open() error {
 // 2. Environment variable
 // 3. Current working directory
 func (context *Context) SetProjectName() error {
-	projectName := context.CLIContext.GlobalString(command.ProjectNameFlag)
+	projectName := context.CLIContext.GlobalString(flags.ProjectNameFlag)
 	if projectName != "" {
 		context.ProjectName = projectName
 		return nil
@@ -75,10 +78,10 @@ func (context *Context) SetProjectName() error {
 // This following is derived from Docker's Libcompose project, Copyright 2015 Docker, Inc.
 // The original code may be found :
 // https://github.com/docker/libcompose/blob/master/project/context.go
-func (c *Context) lookupProjectName() (string, error) {
+func (context *Context) lookupProjectName() (string, error) {
 	file := "."
-	if len(c.ComposeFiles) > 0 {
-		file = c.ComposeFiles[0]
+	if len(context.ComposeFiles) > 0 {
+		file = context.ComposeFiles[0]
 	}
 
 	f, err := filepath.Abs(file)

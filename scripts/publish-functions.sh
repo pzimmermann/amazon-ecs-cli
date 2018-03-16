@@ -16,7 +16,7 @@
 export VERSION=$(cat $(dirname "${0}")/../VERSION)
 
 export ARTIFACT_TAG_LATEST="latest"
-export ARTIFACT_TAG_SHA=$(git rev-parse --short HEAD)
+export ARTIFACT_TAG_SHA=$(git rev-parse --short=7 HEAD)
 export ARTIFACT_TAG_VERSION="v${VERSION}"
 
 
@@ -50,4 +50,26 @@ s3_cp() {
 	fi
 	echo "Copying ${1} to ${2}"
 	aws ${profile} s3 cp "${1}" "${2}" "--acl=${acl}"
+}
+
+s3_pull_push() {
+	profile=""
+	if [[ ! -z "${AWS_PROFILE}" ]]; then
+		profile="--profile=${AWS_PROFILE}"
+	fi
+	if [[ ! -z "${AWS_PROFILE_PUSH}" ]]; then
+		profile_push="--profile=${AWS_PROFILE_PUSH}"
+	else
+		profile_push=$profile
+	fi
+	acl="public-read"
+	if [[ ! -z "${S3_ACL_OVERRIDE}" ]]; then
+		acl="${S3_ACL_OVERRIDE}"
+	fi
+	echo "Copying ${1} to ${2}"
+	# for partitioned regions, we cannot copy files between buckets directly. Save it locally and copy it over
+	tmp=$(mktemp)
+	aws ${profile} s3 cp "${1}" "${tmp}"
+	aws ${profile_push} s3 cp "${tmp}" "${2}" "--acl=${acl}"
+	rm $tmp
 }

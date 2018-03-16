@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils"
@@ -89,7 +89,7 @@ func init() {
 // CloudformationClient defines methods to interact the with the CloudFormationAPI interface.
 type CloudformationClient interface {
 	// TODO: Modify the interface and tbe client to not have the Initialize method.
-	Initialize(*config.CliParams)
+	Initialize(*config.CLIParams)
 	CreateStack(string, string, *CfnStackParams) (string, error)
 	WaitUntilCreateComplete(string) error
 	DeleteStack(string) error
@@ -97,12 +97,14 @@ type CloudformationClient interface {
 	UpdateStack(string, *CfnStackParams) (string, error)
 	WaitUntilUpdateComplete(string) error
 	ValidateStackExists(string) error
+	DescribeNetworkResources(string) error
+	GetStackParameters(string) ([]*cloudformation.Parameter, error)
 }
 
 // cloudformationClient implements CloudFormationClient.
 type cloudformationClient struct {
 	client    cloudformationiface.CloudFormationAPI
-	cliParams *config.CliParams
+	cliParams *config.CLIParams
 	sleeper   utils.Sleeper
 }
 
@@ -112,7 +114,7 @@ func NewCloudformationClient() CloudformationClient {
 }
 
 // Initialize initializes all the fields of the cloudFormationClient object.
-func (c *cloudformationClient) Initialize(params *config.CliParams) {
+func (c *cloudformationClient) Initialize(params *config.CLIParams) {
 	cfnClient := cloudformation.New(params.Session)
 	cfnClient.Handlers.Build.PushBackNamed(clients.CustomUserAgentHandler())
 	c.client = cfnClient
@@ -169,6 +171,23 @@ func (c *cloudformationClient) ValidateStackExists(stackName string) error {
 	return err
 }
 
+// describeStack describes the stack and gets the stack status.
+func (c *cloudformationClient) GetStackParameters(stackName string) ([]*cloudformation.Parameter, error) {
+	output, err := c.client.DescribeStacks(&cloudformation.DescribeStacksInput{
+		StackName: aws.String(stackName),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(output.Stacks) == 0 {
+		return nil, fmt.Errorf("Could not describe stack '%s'", stackName)
+	}
+
+	return output.Stacks[0].Parameters, nil
+}
+
 // WaitUntilCreateComplete waits until the stack creation completes.
 func (c *cloudformationClient) WaitUntilCreateComplete(stackName string) error {
 	return c.waitUntilComplete(stackName, failureInCreateEvent, cloudformation.StackStatusCreateComplete, createStackFailures, maxRetriesCreate)
@@ -195,7 +214,7 @@ func (c *cloudformationClient) WaitUntilUpdateComplete(stackName string) error {
 	return c.waitUntilComplete(stackName, failureInUpdateEvent, cloudformation.StackStatusUpdateComplete, updateStackFailures, maxRetriesUpdate)
 }
 
-// failureInStackEvent defines the callback type, which determins if there's the cloudformation
+// failureInStackEvent defines the callback type, which determines if there's the cloudformation
 // stack event's status indicates failure in creating/updating/deleting a resource.
 type failureInStackEvent func(*cloudformation.StackEvent) bool
 
@@ -219,18 +238,18 @@ func (c *cloudformationClient) waitUntilComplete(stackName string, hasFailed fai
 
 		if successState == status {
 			return nil
-		} else {
-			_, exists := failureStates[status]
-			if exists {
-				log.Debug("Stack creation failed. Getting first failed event")
-				if failureEvent, err := c.firstStackEventWithFailure(stackName, nil, failureStates); err == nil {
-					log.WithFields(log.Fields{
-						"reason":       aws.StringValue(failureEvent.ResourceStatusReason),
-						"resourceType": aws.StringValue(failureEvent.ResourceType),
-					}).Error("Failure event")
-				}
-				return fmt.Errorf("Cloudformation failure waiting for '%s'. State is '%s'", successState, status)
+		}
+
+		_, exists := failureStates[status]
+		if exists {
+			log.Debug("Stack creation failed. Getting first failed event")
+			if failureEvent, err := c.firstStackEventWithFailure(stackName, nil, failureStates); err == nil {
+				log.WithFields(log.Fields{
+					"reason":       aws.StringValue(failureEvent.ResourceStatusReason),
+					"resourceType": aws.StringValue(failureEvent.ResourceType),
+				}).Error("Failure event")
 			}
+			return fmt.Errorf("Cloudformation failure waiting for '%s'. State is '%s'", successState, status)
 		}
 
 		if retryCount%2 == 0 {
@@ -307,6 +326,61 @@ func (c *cloudformationClient) describeStack(stackName string) (string, error) {
 	}
 
 	return aws.StringValue(output.Stacks[0].StackStatus), nil
+}
+
+func (c *cloudformationClient) describeStackResource(stackName string, logicalResourceId string) (*cloudformation.StackResource, error) {
+	input := &cloudformation.DescribeStackResourcesInput{
+		StackName:         aws.String(stackName),
+		LogicalResourceId: aws.String(logicalResourceId),
+	}
+
+	output, err := c.client.DescribeStackResources(input)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(output.StackResources) > 0 {
+		resource := output.StackResources[0]
+		return resource, nil
+	}
+
+	return nil, nil
+}
+
+func displayResourceId(resource *cloudformation.StackResource, name string) {
+	if resource != nil {
+		id := aws.StringValue(resource.PhysicalResourceId)
+		fmt.Printf("%v created: %v\n", name, id)
+	}
+}
+
+func (c *cloudformationClient) DescribeNetworkResources(stackName string) error {
+	// Describe EC2::VPC
+	resource, err := c.describeStackResource(stackName, VPCLogicalResourceId)
+	if err != nil {
+		return err
+	}
+	displayResourceId(resource, "VPC")
+
+	// Describe EC2::SecurityGroup
+	resource, err = c.describeStackResource(stackName, SecurityGroupLogicalResourceId)
+	if err != nil {
+		return err
+	}
+	displayResourceId(resource, "Security Group")
+
+	// Describe EC2::Subnets
+	subnets := []string{Subnet1LogicalResourceId, Subnet2LogicalResourceId}
+	for _, id := range subnets {
+		resource, err = c.describeStackResource(stackName, id)
+		if err != nil {
+			return err
+		}
+		displayResourceId(resource, "Subnet")
+	}
+
+	return nil
 }
 
 // failureInCreateEvent returns an error if the stack event indicates that stack creation event has failed.

@@ -16,12 +16,14 @@ package main
 import (
 	"os"
 
+	"github.com/sirupsen/logrus"
 	ecscompose "github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/factory"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/cluster"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/compose"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/configure"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/image"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/license"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/log"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils/logger"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/version"
 	"github.com/cihub/seelog"
@@ -52,6 +54,11 @@ func main() {
 		imageCommand.ImagesCommand(),
 		licenseCommand.LicenseCommand(),
 		composeCommand.ComposeCommand(composeFactory),
+		logsCommand.LogCommand(),
 	}
-	app.Run(os.Args)
+
+	err := app.Run(os.Args)
+	if err != nil {
+		logrus.Debug(err)
+	}
 }

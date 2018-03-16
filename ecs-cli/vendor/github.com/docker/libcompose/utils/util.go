@@ -3,8 +3,9 @@ package utils
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
 )
@@ -159,4 +160,19 @@ func ConvertKeysToStrings(item interface{}) interface{} {
 	default:
 		return item
 	}
+}
+
+// DurationStrToSecondsInt converts duration string to *int in seconds
+func DurationStrToSecondsInt(s string) *int {
+	if s == "" {
+		return nil
+	}
+	duration, err := time.ParseDuration(s)
+	if err != nil {
+		logrus.Errorf("Failed to parse duration:%v", s)
+		return nil
+	}
+	r := (int)(duration.Seconds())
+	return &r
+
 }

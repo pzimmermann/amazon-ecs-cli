@@ -18,10 +18,11 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/context"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/entity"
-	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/entity/types"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils/cache"
 	composeutils "github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils/compose"
@@ -41,12 +42,12 @@ type Service struct {
 	deploymentConfig *ecs.DeploymentConfiguration
 	loadBalancer     *ecs.LoadBalancer
 	role             string
+	healthCheckGP    *int64
 }
 
 const (
 	ecsActiveResourceCode  = "ACTIVE"
 	ecsMissingResourceCode = "MISSING"
-	entityType             = "service"
 )
 
 // NewService creates an instance of a Service and also sets up a cache for task definition
@@ -58,13 +59,13 @@ func NewService(context *context.Context) entity.ProjectEntity {
 	}
 }
 
-// LoadContext reads the context set in NewService and loads DeploymentConfiguration and LoadBalnacer
+// LoadContext reads the context set in NewService and loads DeploymentConfiguration and LoadBalancer
 func (s *Service) LoadContext() error {
-	maxPercent, err := getInt64FromCLIContext(s.Context(), command.DeploymentMaxPercentFlag)
+	maxPercent, err := getInt64FromCLIContext(s.Context(), flags.DeploymentMaxPercentFlag)
 	if err != nil {
 		return err
 	}
-	minHealthyPercent, err := getInt64FromCLIContext(s.Context(), command.DeploymentMinHealthyPercentFlag)
+	minHealthyPercent, err := getInt64FromCLIContext(s.Context(), flags.DeploymentMinHealthyPercentFlag)
 	if err != nil {
 		return err
 	}
@@ -74,20 +75,27 @@ func (s *Service) LoadContext() error {
 	}
 
 	// Load Balancer
-	role := s.Context().CLIContext.String(command.RoleFlag)
-	targetGroupArn := s.Context().CLIContext.String(command.TargetGroupArnFlag)
-	loadBalancerName := s.Context().CLIContext.String(command.LoadBalancerNameFlag)
-	containerName := s.Context().CLIContext.String(command.ContainerNameFlag)
-	containerPort, err := getInt64FromCLIContext(s.Context(), command.ContainerPortFlag)
+	role := s.Context().CLIContext.String(flags.RoleFlag)
+	targetGroupArn := s.Context().CLIContext.String(flags.TargetGroupArnFlag)
+	loadBalancerName := s.Context().CLIContext.String(flags.LoadBalancerNameFlag)
+	containerName := s.Context().CLIContext.String(flags.ContainerNameFlag)
+	containerPort, err := getInt64FromCLIContext(s.Context(), flags.ContainerPortFlag)
 	if err != nil {
 		return err
 	}
+
+	// Health Check Grace Period
+	healthCheckGP, err := getInt64FromCLIContext(s.Context(), flags.HealthCheckGracePeriodFlag)
+	if err != nil {
+		return err
+	}
+	s.healthCheckGP = healthCheckGP
 
 	// Validates LoadBalancerName and TargetGroupArn cannot exist at the same time
 	// The rest will be taken care off by the API call
 	if role != "" || targetGroupArn != "" || loadBalancerName != "" || containerName != "" || containerPort != nil {
 		if targetGroupArn != "" && loadBalancerName != "" {
-			return errors.Errorf("[--%s] and [--%s] flags cannot both be specified", command.LoadBalancerNameFlag, command.TargetGroupArnFlag)
+			return errors.Errorf("[--%s] and [--%s] flags cannot both be specified", flags.LoadBalancerNameFlag, flags.TargetGroupArnFlag)
 		}
 
 		s.loadBalancer = &ecs.LoadBalancer{
@@ -160,6 +168,10 @@ func (s *Service) Create() error {
 	if err != nil {
 		return err
 	}
+	err = entity.OptionallyCreateLogs(s)
+	if err != nil {
+		return err
+	}
 	return s.createService()
 }
 
@@ -175,8 +187,12 @@ func (s *Service) Start() error {
 		// Read the custom error returned from describeService to see if the resource was missing
 		if strings.Contains(err.Error(), ecsMissingResourceCode) {
 			return fmt.Errorf("Please use '%s' command to create the service '%s' first",
-				command.CreateServiceCommandName, entity.GetServiceName(s))
+				flags.CreateServiceCommandName, entity.GetServiceName(s))
 		}
+		return err
+	}
+	err = entity.OptionallyCreateLogs(s)
+	if err != nil {
 		return err
 	}
 	return s.startService(ecsService)
@@ -205,6 +221,11 @@ func (s *Service) Up() error {
 		return err
 	}
 
+	err = entity.OptionallyCreateLogs(s)
+	if err != nil {
+		return err
+	}
+
 	// if ECS service was not created before, or is inactive, create and start the ECS Service
 	if missingServiceErr || aws.StringValue(ecsService.Status) != ecsActiveResourceCode {
 		// uses the latest task definition to create the service
@@ -215,8 +236,12 @@ func (s *Service) Up() error {
 		return s.Start()
 	}
 
-	oldTaskDefinitionId := entity.GetIdFromArn(ecsService.TaskDefinition)
-	newTaskDefinitionId := entity.GetIdFromArn(newTaskDefinition.TaskDefinitionArn)
+	ecsServiceName := aws.StringValue(ecsService.ServiceName)
+	if s.loadBalancer != nil {
+		log.WithFields(log.Fields{
+			"serviceName": ecsServiceName,
+		}).Warn("You cannot update the load balancer configuration on an existing service.")
+	}
 
 	oldCount := aws.Int64Value(ecsService.DesiredCount)
 	newCount := int64(1)
@@ -224,16 +249,26 @@ func (s *Service) Up() error {
 		newCount = oldCount // get the current non-zero count
 	}
 
-	// if both the task definitions are the same, just start the service
+	// if both the task definitions are the same, call update with the new count
+	oldTaskDefinitionId := entity.GetIdFromArn(ecsService.TaskDefinition)
+	newTaskDefinitionId := entity.GetIdFromArn(newTaskDefinition.TaskDefinitionArn)
+
 	if oldTaskDefinitionId == newTaskDefinitionId {
-		return s.startService(ecsService)
+		return s.updateService(newCount)
 	}
 
-	ecsServiceName := aws.StringValue(ecsService.ServiceName)
 	deploymentConfig := s.DeploymentConfig()
 	// if the task definitions were different, updateService with new task definition
 	// this creates a deployment in ECS and slowly takes down the containers with old ones and starts new ones
-	err = s.Context().ECSClient.UpdateService(ecsServiceName, newTaskDefinitionId, newCount, deploymentConfig)
+
+	networkConfig, err := composeutils.ConvertToECSNetworkConfiguration(s.projectContext.ECSParams)
+	if err != nil {
+		return err
+	}
+
+	forceDeployment := s.Context().CLIContext.Bool(flags.ForceDeploymentFlag)
+
+	err = s.Context().ECSClient.UpdateService(ecsServiceName, newTaskDefinitionId, newCount, deploymentConfig, networkConfig, s.healthCheckGP, forceDeployment)
 	if err != nil {
 		return err
 	}
@@ -248,6 +283,9 @@ func (s *Service) Up() error {
 	if deploymentConfig != nil && deploymentConfig.MinimumHealthyPercent != nil {
 		fields["deployment-min-healthy-percent"] = aws.Int64Value(deploymentConfig.MinimumHealthyPercent)
 	}
+	if s.healthCheckGP != nil {
+		fields["health-check-grace-period"] = *s.healthCheckGP
+	}
 
 	log.WithFields(fields).Info("Updated the ECS service with a new task definition. " +
 		"Old containers will be stopped automatically, and replaced with new ones")
@@ -257,7 +295,7 @@ func (s *Service) Up() error {
 // Info returns a formatted list of containers (running and stopped) started by this service
 func (s *Service) Info(filterProjectTasks bool) (project.InfoSet, error) {
 	// filterProjectTasks is not honored for services, because ECS Services have their
-	// own custom StartedBy field, overriding that with startedBy=project will result in no tasks
+	// own custom Group field, overriding that with startedBy=project will result in no tasks
 	// We should instead filter by ServiceName=service
 	return entity.Info(s, false)
 }
@@ -311,8 +349,8 @@ func (s *Service) Run(commandOverrides map[string][]string) error {
 }
 
 // EntityType returns service as the type
-func (s *Service) EntityType() string {
-	return entityType
+func (s *Service) EntityType() types.Type {
+	return types.Service
 }
 
 // ----------- Commands' helper functions --------
@@ -321,8 +359,20 @@ func (s *Service) EntityType() string {
 func (s *Service) createService() error {
 	serviceName := entity.GetServiceName(s)
 	taskDefinitionID := entity.GetIdFromArn(s.TaskDefinition().TaskDefinitionArn)
+	launchType := s.Context().CLIParams.LaunchType
 
-	err := s.Context().ECSClient.CreateService(serviceName, taskDefinitionID, s.loadBalancer, s.role, s.DeploymentConfig())
+	networkConfig, err := composeutils.ConvertToECSNetworkConfiguration(s.projectContext.ECSParams)
+	if err != nil {
+		return err
+	}
+	if err = entity.ValidateFargateParams(s.Context().ECSParams, launchType); err != nil {
+		return err
+	}
+	if s.healthCheckGP != nil && s.loadBalancer == nil {
+		return fmt.Errorf("--%v is only valid for services configured to use load balancers", flags.HealthCheckGracePeriodFlag)
+	}
+
+	err = s.Context().ECSClient.CreateService(serviceName, taskDefinitionID, s.loadBalancer, s.role, s.DeploymentConfig(), networkConfig, launchType, s.healthCheckGP)
 	if err != nil {
 		return err
 	}
@@ -349,8 +399,17 @@ func (s *Service) describeService() (*ecs.Service, error) {
 // startService checks if the service has a zero desired count and updates the count to 1 (of each container)
 func (s *Service) startService(ecsService *ecs.Service) error {
 	desiredCount := aws.Int64Value(ecsService.DesiredCount)
+	forceDeployment := s.Context().CLIContext.Bool(flags.ForceDeploymentFlag)
 	if desiredCount != 0 {
 		serviceName := aws.StringValue(ecsService.ServiceName)
+		if forceDeployment {
+			log.WithFields(log.Fields{
+				"serviceName":      serviceName,
+				"desiredCount":     desiredCount,
+				"force-deployment": strconv.FormatBool(forceDeployment),
+			}).Info("Forcing new deployment of running ECS Service")
+			return s.updateService(desiredCount)
+		}
 		//NoOp
 		log.WithFields(log.Fields{
 			"serviceName":  serviceName,
@@ -366,9 +425,17 @@ func (s *Service) startService(ecsService *ecs.Service) error {
 func (s *Service) updateService(count int64) error {
 	serviceName := entity.GetServiceName(s)
 	deploymentConfig := s.DeploymentConfig()
-	if err := s.Context().ECSClient.UpdateServiceCount(serviceName, count, deploymentConfig); err != nil {
+	networkConfig, err := composeutils.ConvertToECSNetworkConfiguration(s.projectContext.ECSParams)
+	forceDeployment := s.Context().CLIContext.Bool(flags.ForceDeploymentFlag)
+
+	if err != nil {
 		return err
 	}
+
+	if err = s.Context().ECSClient.UpdateService(serviceName, "", count, deploymentConfig, networkConfig, s.healthCheckGP, forceDeployment); err != nil {
+		return err
+	}
+
 	fields := log.Fields{
 		"serviceName":  serviceName,
 		"desiredCount": count,
@@ -378,6 +445,12 @@ func (s *Service) updateService(count int64) error {
 	}
 	if deploymentConfig != nil && deploymentConfig.MinimumHealthyPercent != nil {
 		fields["deployment-min-healthy-percent"] = aws.Int64Value(deploymentConfig.MinimumHealthyPercent)
+	}
+	if s.healthCheckGP != nil {
+		fields["health-check-grace-period"] = *s.healthCheckGP
+	}
+	if forceDeployment {
+		fields["force-deployment"] = forceDeployment
 	}
 
 	log.WithFields(fields).Info("Updated ECS service successfully")

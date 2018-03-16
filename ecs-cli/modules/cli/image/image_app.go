@@ -21,11 +21,11 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	ecrclient "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/ecr"
 	stsclient "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/aws/sts"
 	dockerclient "github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients/docker"
-	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecr"
@@ -53,27 +53,23 @@ const (
 func ImagePush(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'push': ", err)
-		return
+		logrus.Fatal("Error executing 'push': ", err)
 	}
 
-	ecsParams, err := config.NewCliParams(c, rdwr)
+	ecsParams, err := config.NewCLIParams(c, rdwr)
 	if err != nil {
-		logrus.Error("Error executing 'push': ", err)
-		return
+		logrus.Fatal("Error executing 'push': ", err)
 	}
 
 	dockerClient, err := dockerclient.NewClient()
 	if err != nil {
-		logrus.Error("Error executing 'push': ", err)
-		return
+		logrus.Fatal("Error executing 'push': ", err)
 	}
 	ecrClient := ecrclient.NewClient(ecsParams)
 	stsClient := stsclient.NewClient(ecsParams)
 
 	if err := pushImage(c, rdwr, dockerClient, ecrClient, stsClient); err != nil {
-		logrus.Error("Error executing 'push': ", err)
-		return
+		logrus.Fatal("Error executing 'push': ", err)
 	}
 }
 
@@ -81,27 +77,23 @@ func ImagePush(c *cli.Context) {
 func ImagePull(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'pull': ", err)
-		return
+		logrus.Fatal("Error executing 'pull': ", err)
 	}
 
-	ecsParams, err := config.NewCliParams(c, rdwr)
+	ecsParams, err := config.NewCLIParams(c, rdwr)
 	if err != nil {
-		logrus.Error("Error executing 'pull': ", err)
-		return
+		logrus.Fatal("Error executing 'pull': ", err)
 	}
 
 	dockerClient, err := dockerclient.NewClient()
 	if err != nil {
-		logrus.Error("Error executing 'pull': ", err)
-		return
+		logrus.Fatal("Error executing 'pull': ", err)
 	}
 	ecrClient := ecrclient.NewClient(ecsParams)
 	stsClient := stsclient.NewClient(ecsParams)
 
 	if err := pullImage(c, rdwr, dockerClient, ecrClient, stsClient); err != nil {
-		logrus.Error("Error executing 'pull': ", err)
-		return
+		logrus.Fatal("Error executing 'pull': ", err)
 	}
 }
 
@@ -109,25 +101,23 @@ func ImagePull(c *cli.Context) {
 func ImageList(c *cli.Context) {
 	rdwr, err := config.NewReadWriter()
 	if err != nil {
-		logrus.Error("Error executing 'images': ", err)
-		return
+		logrus.Fatal("Error executing 'images': ", err)
 	}
 
-	ecsParams, err := config.NewCliParams(c, rdwr)
+	ecsParams, err := config.NewCLIParams(c, rdwr)
 	if err != nil {
-		logrus.Error("Error executing 'images': ", err)
-		return
+		logrus.Fatal("Error executing 'images': ", err)
 	}
 
 	ecrClient := ecrclient.NewClient(ecsParams)
 	if err := getImages(c, rdwr, ecrClient); err != nil {
-		logrus.Error("Error executing 'images': ", err)
+		logrus.Fatal("Error executing 'images': ", err)
 		return
 	}
 }
 
 func pushImage(c *cli.Context, rdwr config.ReadWriter, dockerClient dockerclient.Client, ecrClient ecrclient.Client, stsClient stsclient.Client) error {
-	registryID := c.String(command.RegistryIdFlag)
+	registryID := c.String(flags.RegistryIdFlag)
 	args := c.Args()
 
 	if len(args) != 1 {
@@ -169,15 +159,12 @@ func pushImage(c *cli.Context, rdwr config.ReadWriter, dockerClient dockerclient
 		ServerAddress: ecrAuth.ProxyEndpoint,
 	}
 
-	if err := dockerClient.PushImage(repositoryURI, tag, ecrAuth.Registry, dockerAuth); err != nil {
-		return err
-	}
-
-	return nil
+	err = dockerClient.PushImage(repositoryURI, tag, ecrAuth.Registry, dockerAuth)
+	return err
 }
 
 func pullImage(c *cli.Context, rdwr config.ReadWriter, dockerClient dockerclient.Client, ecrClient ecrclient.Client, stsClient stsclient.Client) error {
-	registryID := c.String(command.RegistryIdFlag)
+	registryID := c.String(flags.RegistryIdFlag)
 	args := c.Args()
 	if len(args) != 1 {
 		return fmt.Errorf("ecs-cli pull requires exactly 1 argument")
@@ -203,11 +190,8 @@ func pullImage(c *cli.Context, rdwr config.ReadWriter, dockerClient dockerclient
 	}
 
 	// Pull Image
-	if err := dockerClient.PullImage(repositoryURI, tag, dockerAuth); err != nil {
-		return err
-	}
-
-	return nil
+	err = dockerClient.PullImage(repositoryURI, tag, dockerAuth)
+	return err
 }
 
 type imageInfo struct {
@@ -219,7 +203,7 @@ type imageInfo struct {
 }
 
 func getImages(c *cli.Context, rdwr config.ReadWriter, ecrClient ecrclient.Client) error {
-	registryID := c.String(command.RegistryIdFlag)
+	registryID := c.String(flags.RegistryIdFlag)
 	args := c.Args() // repository names
 
 	totalCount := 0
@@ -278,14 +262,14 @@ func printImageRow(w io.Writer, info imageInfo) {
 }
 
 func getTagStatus(c *cli.Context) string {
-	if c.Bool(command.TaggedFlag) && c.Bool(command.UntaggedFlag) {
+	if c.Bool(flags.TaggedFlag) && c.Bool(flags.UntaggedFlag) {
 		return ""
 	}
 
-	if c.Bool(command.TaggedFlag) {
+	if c.Bool(flags.TaggedFlag) {
 		return ecr.TagStatusTagged
 	}
-	if c.Bool(command.UntaggedFlag) {
+	if c.Bool(flags.UntaggedFlag) {
 		return ecr.TagStatusUntagged
 	}
 

@@ -56,14 +56,14 @@ func (_mr *_MockECSClientRecorder) CreateCluster(arg0 interface{}) *gomock.Call 
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateCluster", arg0)
 }
 
-func (_m *MockECSClient) CreateService(_param0 string, _param1 string, _param2 *ecs.LoadBalancer, _param3 string, _param4 *ecs.DeploymentConfiguration) error {
-	ret := _m.ctrl.Call(_m, "CreateService", _param0, _param1, _param2, _param3, _param4)
+func (_m *MockECSClient) CreateService(_param0 string, _param1 string, _param2 *ecs.LoadBalancer, _param3 string, _param4 *ecs.DeploymentConfiguration, _param5 *ecs.NetworkConfiguration, _param6 string, _param7 *int64) error {
+	ret := _m.ctrl.Call(_m, "CreateService", _param0, _param1, _param2, _param3, _param4, _param5, _param6, _param7)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockECSClientRecorder) CreateService(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateService", arg0, arg1, arg2, arg3, arg4)
+func (_mr *_MockECSClientRecorder) CreateService(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateService", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 }
 
 func (_m *MockECSClient) DeleteCluster(_param0 string) (string, error) {
@@ -141,7 +141,7 @@ func (_mr *_MockECSClientRecorder) GetTasksPages(arg0, arg1 interface{}) *gomock
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetTasksPages", arg0, arg1)
 }
 
-func (_m *MockECSClient) Initialize(_param0 *config.CliParams) {
+func (_m *MockECSClient) Initialize(_param0 *config.CLIParams) {
 	_m.ctrl.Call(_m, "Initialize", _param0)
 }
 
@@ -182,15 +182,15 @@ func (_mr *_MockECSClientRecorder) RegisterTaskDefinitionIfNeeded(arg0, arg1 int
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "RegisterTaskDefinitionIfNeeded", arg0, arg1)
 }
 
-func (_m *MockECSClient) RunTask(_param0 string, _param1 string, _param2 int) (*ecs.RunTaskOutput, error) {
-	ret := _m.ctrl.Call(_m, "RunTask", _param0, _param1, _param2)
+func (_m *MockECSClient) RunTask(_param0 string, _param1 string, _param2 int, _param3 *ecs.NetworkConfiguration, _param4 string) (*ecs.RunTaskOutput, error) {
+	ret := _m.ctrl.Call(_m, "RunTask", _param0, _param1, _param2, _param3, _param4)
 	ret0, _ := ret[0].(*ecs.RunTaskOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-func (_mr *_MockECSClientRecorder) RunTask(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "RunTask", arg0, arg1, arg2)
+func (_mr *_MockECSClientRecorder) RunTask(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "RunTask", arg0, arg1, arg2, arg3, arg4)
 }
 
 func (_m *MockECSClient) RunTaskWithOverrides(_param0 string, _param1 string, _param2 int, _param3 map[string][]string) (*ecs.RunTaskOutput, error) {
@@ -214,22 +214,12 @@ func (_mr *_MockECSClientRecorder) StopTask(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "StopTask", arg0)
 }
 
-func (_m *MockECSClient) UpdateService(_param0 string, _param1 string, _param2 int64, _param3 *ecs.DeploymentConfiguration) error {
-	ret := _m.ctrl.Call(_m, "UpdateService", _param0, _param1, _param2, _param3)
+func (_m *MockECSClient) UpdateService(_param0 string, _param1 string, _param2 int64, _param3 *ecs.DeploymentConfiguration, _param4 *ecs.NetworkConfiguration, _param5 *int64, _param6 bool) error {
+	ret := _m.ctrl.Call(_m, "UpdateService", _param0, _param1, _param2, _param3, _param4, _param5, _param6)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockECSClientRecorder) UpdateService(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "UpdateService", arg0, arg1, arg2, arg3)
-}
-
-func (_m *MockECSClient) UpdateServiceCount(_param0 string, _param1 int64, _param2 *ecs.DeploymentConfiguration) error {
-	ret := _m.ctrl.Call(_m, "UpdateServiceCount", _param0, _param1, _param2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-func (_mr *_MockECSClientRecorder) UpdateServiceCount(arg0, arg1, arg2 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "UpdateServiceCount", arg0, arg1, arg2)
+func (_mr *_MockECSClientRecorder) UpdateService(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "UpdateService", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }

@@ -17,6 +17,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAddAndValidate(t *testing.T) {
@@ -27,15 +29,7 @@ func TestAddAndValidate(t *testing.T) {
 		t.Error("Expected validation error for empty parameter key map")
 	}
 
-	err = cfnParams.Add(ParameterKeyKeyPairName, "default")
-	if err != nil {
-		t.Error("Error adding parameter: ", err)
-	}
-	err = cfnParams.Validate()
-	if err == nil {
-		t.Errorf("Expected validation error when only %s is specified", ParameterKeyKeyPairName)
-	}
-
+	// Add AMI ID
 	err = cfnParams.Add(ParameterKeyAmiId, "ami-12345")
 	if err != nil {
 		t.Error("Error adding parameter: ", err)
@@ -45,6 +39,7 @@ func TestAddAndValidate(t *testing.T) {
 		t.Errorf("Expected validation error when %s is not specified", ParameterKeyCluster)
 	}
 
+	// Add Cluster
 	err = cfnParams.Add(ParameterKeyCluster, "")
 	if err != nil {
 		t.Error("Error adding parameter: ", err)
@@ -70,20 +65,25 @@ func TestAddAndValidate(t *testing.T) {
 
 	clusterValue, exists := cfnParams.nameToKeys[ParameterKeyCluster]
 	if !exists {
-		t.Errorf("Expcted key %s does not exist", ParameterKeyCluster)
+		t.Errorf("Expected key %s does not exist", ParameterKeyCluster)
 	}
 
 	if "default" != clusterValue {
-		t.Errorf("Mismtach in cluster name. Expected [%s] Got [%s]", "default", clusterValue)
+		t.Errorf("Mismatch in cluster name. Expected [%s] Got [%s]", "default", clusterValue)
 	}
 }
 
-func TestAddWithUsePreviousValueAndValidate(t *testing.T) {
-	cfnParams := NewCfnStackParamsForUpdate()
-	err := cfnParams.Validate()
-	if err != nil {
-		t.Error("Error validating params for update: ", err)
+func TestAddWithUsePreviousValue(t *testing.T) {
+	existingParameters := []*cloudformation.Parameter{
+		&cloudformation.Parameter{
+			ParameterKey: aws.String("SomeParam1"),
+		},
+		&cloudformation.Parameter{
+			ParameterKey: aws.String("SomeParam2"),
+		},
 	}
+	cfnParams, err := NewCfnStackParamsForUpdate(existingParameters)
+	assert.NoError(t, err, "Unexpected error getting New CFN Stack Params")
 
 	params := cfnParams.Get()
 	if 0 == len(params) {
@@ -105,10 +105,6 @@ func TestAddWithUsePreviousValueAndValidate(t *testing.T) {
 	err = cfnParams.AddWithUsePreviousValue(ParameterKeyAsgMaxSize, false)
 	if err != nil {
 		t.Errorf("Error adding parameter with use previous value '%s': '%v'", ParameterKeyAsgMaxSize, err)
-	}
-	err = cfnParams.Validate()
-	if err == nil {
-		t.Errorf("Expected error for param '%s' when usePrevious is false and value is not set", ParameterKeyAsgMaxSize)
 	}
 
 	size := "3"

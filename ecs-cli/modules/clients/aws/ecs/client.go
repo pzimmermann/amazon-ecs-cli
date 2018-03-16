@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils/cache"
@@ -35,8 +35,8 @@ type ProcessTasksAction func(tasks []*ecs.Task) error
 
 // ECSClient is an interface that specifies only the methods used from the sdk interface. Intended to make mocking and testing easier.
 type ECSClient interface {
-	// TODO: Modify the interface and tbe client to not have the Initialize method.
-	Initialize(params *config.CliParams)
+	// TODO: Modify the interface and the client to not have the Initialize method.
+	Initialize(params *config.CLIParams)
 
 	// Cluster related
 	CreateCluster(clusterName string) (string, error)
@@ -44,9 +44,8 @@ type ECSClient interface {
 	IsActiveCluster(clusterName string) (bool, error)
 
 	// Service related
-	CreateService(serviceName, taskDefName string, loadBalancer *ecs.LoadBalancer, role string, deploymentConfig *ecs.DeploymentConfiguration) error
-	UpdateServiceCount(serviceName string, count int64, deploymentConfig *ecs.DeploymentConfiguration) error
-	UpdateService(serviceName, taskDefinitionName string, count int64, deploymentConfig *ecs.DeploymentConfiguration) error
+	CreateService(serviceName, taskDefName string, loadBalancer *ecs.LoadBalancer, role string, deploymentConfig *ecs.DeploymentConfiguration, networkConfig *ecs.NetworkConfiguration, launchType string, healthCheckGracePeriod *int64) error
+	UpdateService(serviceName, taskDefinitionName string, count int64, deploymentConfig *ecs.DeploymentConfiguration, networkConfig *ecs.NetworkConfiguration, healthCheckGracePeriod *int64, force bool) error
 	DescribeService(serviceName string) (*ecs.DescribeServicesOutput, error)
 	DeleteService(serviceName string) error
 
@@ -57,8 +56,8 @@ type ECSClient interface {
 
 	// Tasks related
 	GetTasksPages(listTasksInput *ecs.ListTasksInput, fn ProcessTasksAction) error
-	RunTask(taskDefinition, startedBy string, count int) (*ecs.RunTaskOutput, error)
-	RunTaskWithOverrides(taskDefinition, startedBy string, count int, overrides map[string][]string) (*ecs.RunTaskOutput, error)
+	RunTask(taskDefinition, taskGroup string, count int, networkConfig *ecs.NetworkConfiguration, launchType string) (*ecs.RunTaskOutput, error)
+	RunTaskWithOverrides(taskDefinition, taskGroup string, count int, overrides map[string][]string) (*ecs.RunTaskOutput, error)
 	StopTask(taskID string) error
 	DescribeTasks(taskIds []*string) ([]*ecs.Task, error)
 
@@ -69,7 +68,7 @@ type ECSClient interface {
 // ecsClient implements ECSClient
 type ecsClient struct {
 	client ecsiface.ECSAPI
-	params *config.CliParams
+	params *config.CLIParams
 }
 
 // NewECSClient creates a new ECS client
@@ -77,7 +76,7 @@ func NewECSClient() ECSClient {
 	return &ecsClient{}
 }
 
-func (c *ecsClient) Initialize(params *config.CliParams) {
+func (c *ecsClient) Initialize(params *config.CLIParams) {
 	client := ecs.New(params.Session)
 	client.Handlers.Build.PushBackNamed(clients.CustomUserAgentHandler())
 	c.client = client
@@ -94,7 +93,8 @@ func (c *ecsClient) CreateCluster(clusterName string) (string, error) {
 		return "", err
 	}
 	log.WithFields(log.Fields{
-		"cluster": *resp.Cluster.ClusterName,
+		"cluster": aws.StringValue(resp.Cluster.ClusterName),
+		"region":  aws.StringValue(c.params.Session.Config.Region),
 	}).Info("Created cluster")
 
 	return *resp.Cluster.ClusterName, nil
@@ -131,7 +131,7 @@ func (c *ecsClient) DeleteService(serviceName string) error {
 	return nil
 }
 
-func (c *ecsClient) CreateService(serviceName, taskDefName string, loadBalancer *ecs.LoadBalancer, role string, deploymentConfig *ecs.DeploymentConfiguration) error {
+func (c *ecsClient) CreateService(serviceName, taskDefName string, loadBalancer *ecs.LoadBalancer, role string, deploymentConfig *ecs.DeploymentConfiguration, networkConfig *ecs.NetworkConfiguration, launchType string, healthCheckGracePeriod *int64) error {
 	createServiceInput := &ecs.CreateServiceInput{
 		DesiredCount:            aws.Int64(0),            // Required
 		ServiceName:             aws.String(serviceName), // Required
@@ -140,6 +140,18 @@ func (c *ecsClient) CreateService(serviceName, taskDefName string, loadBalancer 
 		DeploymentConfiguration: deploymentConfig,
 		LoadBalancers:           []*ecs.LoadBalancer{loadBalancer},
 		Role:                    aws.String(role),
+	}
+
+	if healthCheckGracePeriod != nil {
+		createServiceInput.HealthCheckGracePeriodSeconds = aws.Int64(*healthCheckGracePeriod)
+	}
+
+	if networkConfig != nil {
+		createServiceInput.NetworkConfiguration = networkConfig
+	}
+
+	if launchType != "" {
+		createServiceInput.LaunchType = aws.String(launchType)
 	}
 
 	if _, err := c.client.CreateService(createServiceInput); err != nil {
@@ -160,22 +172,31 @@ func (c *ecsClient) CreateService(serviceName, taskDefName string, loadBalancer 
 	if deploymentConfig != nil && deploymentConfig.MinimumHealthyPercent != nil {
 		fields["deployment-min-healthy-percent"] = aws.Int64Value(deploymentConfig.MinimumHealthyPercent)
 	}
+	if healthCheckGracePeriod != nil {
+		fields["health-check-grace-period"] = *healthCheckGracePeriod
+	}
 
 	log.WithFields(fields).Info("Created an ECS service")
 	return nil
 }
 
-func (c *ecsClient) UpdateServiceCount(serviceName string, count int64, deploymentConfig *ecs.DeploymentConfiguration) error {
-	return c.UpdateService(serviceName, "", count, deploymentConfig)
-}
-
-func (c *ecsClient) UpdateService(serviceName, taskDefinition string, count int64, deploymentConfig *ecs.DeploymentConfiguration) error {
+func (c *ecsClient) UpdateService(serviceName, taskDefinition string, count int64, deploymentConfig *ecs.DeploymentConfiguration, networkConfig *ecs.NetworkConfiguration, healthCheckGracePeriod *int64, force bool) error {
 	input := &ecs.UpdateServiceInput{
 		DesiredCount:            aws.Int64(count),
 		Service:                 aws.String(serviceName),
 		Cluster:                 aws.String(c.params.Cluster),
 		DeploymentConfiguration: deploymentConfig,
+		ForceNewDeployment:      &force,
 	}
+
+	if healthCheckGracePeriod != nil {
+		input.HealthCheckGracePeriodSeconds = aws.Int64(*healthCheckGracePeriod)
+	}
+
+	if networkConfig != nil {
+		input.NetworkConfiguration = networkConfig
+	}
+
 	if taskDefinition != "" {
 		input.TaskDefinition = aws.String(taskDefinition)
 	}
@@ -284,10 +305,6 @@ func cachedTaskDefinitionRevisionIsActive(cachedTaskDefinition *ecs.TaskDefiniti
 	return *taskDefinitionOfRecord.Status == ecs.TaskDefinitionStatusActive
 }
 
-// constructTaskDefinitionCacheHash computes md5sum of the region, awsAccountId and the requested task definition data
-// BUG(juanrhenals) The requested Task Definition data (taskDefinitionRequest) is not created in a deterministic fashion because there are maps within
-// the request ecs.RegisterTaskDefinitionInput structure, and map iteration in Go is not deterministic. We need to fix this.
-// FIXED(pzimmermann) using a marshalled json representation for the task definition data to be deterministic
 func (c *ecsClient) constructTaskDefinitionCacheHash(taskDefinition *ecs.TaskDefinition, request *ecs.RegisterTaskDefinitionInput) string {
 	// Get the region from the ecsClient configuration
 	region := aws.StringValue(c.params.Session.Config.Region)
@@ -387,13 +404,24 @@ func (c *ecsClient) DescribeTasks(taskArns []*string) ([]*ecs.Task, error) {
 }
 
 // RunTask issues a run task request for the input task definition
-func (c *ecsClient) RunTask(taskDefinition, startedBy string, count int) (*ecs.RunTaskOutput, error) {
-	resp, err := c.client.RunTask(&ecs.RunTaskInput{
+func (c *ecsClient) RunTask(taskDefinition, group string, count int, networkConfig *ecs.NetworkConfiguration, launchType string) (*ecs.RunTaskOutput, error) {
+	runTaskInput := &ecs.RunTaskInput{
 		Cluster:        aws.String(c.params.Cluster),
 		TaskDefinition: aws.String(taskDefinition),
-		StartedBy:      aws.String(startedBy),
+		Group:          aws.String(group),
 		Count:          aws.Int64(int64(count)),
-	})
+	}
+
+	if networkConfig != nil {
+		runTaskInput.NetworkConfiguration = networkConfig
+	}
+
+	if launchType != "" {
+		runTaskInput.LaunchType = aws.String(launchType)
+	}
+
+	resp, err := c.client.RunTask(runTaskInput)
+
 	if err != nil {
 		log.WithFields(log.Fields{
 			"task definition": taskDefinition,
@@ -404,7 +432,7 @@ func (c *ecsClient) RunTask(taskDefinition, startedBy string, count int) (*ecs.R
 }
 
 // RunTask issues a run task request for the input task definition
-func (c *ecsClient) RunTaskWithOverrides(taskDefinition, startedBy string, count int, overrides map[string][]string) (*ecs.RunTaskOutput, error) {
+func (c *ecsClient) RunTaskWithOverrides(taskDefinition, group string, count int, overrides map[string][]string) (*ecs.RunTaskOutput, error) {
 	commandOverrides := []*ecs.ContainerOverride{}
 	for cont, command := range overrides {
 		contOverride := &ecs.ContainerOverride{
@@ -420,7 +448,7 @@ func (c *ecsClient) RunTaskWithOverrides(taskDefinition, startedBy string, count
 	resp, err := c.client.RunTask(&ecs.RunTaskInput{
 		Cluster:        aws.String(c.params.Cluster),
 		TaskDefinition: aws.String(taskDefinition),
-		StartedBy:      aws.String(startedBy),
+		Group:          aws.String(group),
 		Count:          aws.Int64(int64(count)),
 		Overrides:      ecsOverrides,
 	})

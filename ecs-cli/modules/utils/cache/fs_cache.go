@@ -17,7 +17,9 @@ import (
 	"encoding/gob"
 	"os"
 	"path/filepath"
+	"runtime"
 
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/utils"
 )
 
@@ -25,6 +27,9 @@ import (
 var osOpen = os.Open
 var osCreate = os.Create
 var osMkdirAll = os.MkdirAll
+var getOSName = func() string {
+	return runtime.GOOS
+}
 
 // rw only for the user in-line with how most programs setup their cache
 // directories. Also, this directory could container sensitive-ish files due to
@@ -39,8 +44,11 @@ func cacheDir(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO, speciailize for windows, possibly OS X
-	return filepath.Join(homedir, ".cache", cachePrefix, name), nil
+	path := filepath.Join(homedir, ".cache", cachePrefix, name)
+	if getOSName() == "windows" {
+		path = filepath.Join(homedir, config.GetWindowsBaseDataPath(), "cache", name)
+	}
+	return path, nil
 }
 
 type fsCache struct {
@@ -68,8 +76,8 @@ func NewFSCache(name string) (Cache, error) {
 	}, nil
 }
 
-func (self *fsCache) Put(key string, val interface{}) (retErr error) {
-	file, err := osCreate(filepath.Join(self.cacheDir, key))
+func (cache *fsCache) Put(key string, val interface{}) (retErr error) {
+	file, err := osCreate(filepath.Join(cache.cacheDir, key))
 	if err != nil {
 		return err
 	}
@@ -85,8 +93,8 @@ func (self *fsCache) Put(key string, val interface{}) (retErr error) {
 	return valEnc.Encode(val)
 }
 
-func (self *fsCache) Get(key string, i interface{}) error {
-	file, err := osOpen(filepath.Join(self.cacheDir, key))
+func (cache *fsCache) Get(key string, i interface{}) error {
+	file, err := osOpen(filepath.Join(cache.cacheDir, key))
 	if err != nil {
 		return err
 	}

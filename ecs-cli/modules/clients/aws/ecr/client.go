@@ -16,7 +16,7 @@ package ecr
 import (
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/aws-sdk-go/aws"
@@ -49,12 +49,12 @@ type Client interface {
 type ecrClient struct {
 	client      ecriface.ECRAPI
 	loginClient login.Client
-	params      *config.CliParams
+	params      *config.CLIParams
 	auth        *Auth
 }
 
 // NewClient Creates a new ECR client
-func NewClient(params *config.CliParams) Client {
+func NewClient(params *config.CLIParams) Client {
 	client := ecr.New(params.Session, params.Session.Config)
 	client.Handlers.Build.PushBackNamed(clients.CustomUserAgentHandler())
 	loginClient := login.DefaultClientFactory{}.NewClientWithOptions(login.Options{
@@ -65,7 +65,7 @@ func NewClient(params *config.CliParams) Client {
 	return newClient(params, client, loginClient)
 }
 
-func newClient(params *config.CliParams, client ecriface.ECRAPI, loginClient login.Client) Client {
+func newClient(params *config.CLIParams, client ecriface.ECRAPI, loginClient login.Client) Client {
 	return &ecrClient{
 		client:      client,
 		loginClient: loginClient,
@@ -161,10 +161,8 @@ func (c *ecrClient) describeRepositories(repositoryNames []*string, registryID s
 
 	// Skip DescribeRepositories calls if repositoryNames are specified
 	if len(repositoryNames) > 0 {
-		if err := outputFn(repositoryNames); err != nil {
-			return err
-		}
-		return nil
+		err := outputFn(repositoryNames)
+		return err
 	}
 
 	if registryID != "" {

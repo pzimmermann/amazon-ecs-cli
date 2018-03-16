@@ -15,61 +15,113 @@ package config
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/Sirupsen/logrus"
-	ecscli "github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
-// CliParams saves config to create an aws service clients
-type CliParams struct {
+const (
+	// Launch types are case sensitive
+	LaunchTypeFargate = "FARGATE"
+	LaunchTypeEC2     = "EC2"
+	LaunchTypeDefault = "EC2"
+)
+
+// CLIParams saves config to create an aws service clients
+type CLIParams struct {
 	Cluster                  string
 	Session                  *session.Session
-	ComposeProjectNamePrefix string
 	ComposeServiceNamePrefix string
-	CFNStackNamePrefix       string
+	ComposeProjectNamePrefix string // Deprecated; remains for backwards compatibility
+	CFNStackName             string
+	LaunchType               string
 }
 
-func (p *CliParams) GetCfnStackName() string {
-	return fmt.Sprintf("%s%s", p.CFNStackNamePrefix, p.Cluster)
+// Searches as far up the context as necessary. This function works no matter
+// how many layers of nested subcommands there are. It is more powerful
+// than merely calling context.String and context.GlobalString
+func recursiveFlagSearch(context *cli.Context, flag string) string {
+	if context == nil {
+		return ""
+	} else if value := context.String(flag); value != "" {
+		return value
+	} else {
+		return recursiveFlagSearch(context.Parent(), flag)
+	}
 }
 
-// NewCliParams creates a new ECSParams object from the config file.
-func NewCliParams(context *cli.Context, rdwr ReadWriter) (*CliParams, error) {
-	ecsConfig, err := rdwr.GetConfig()
+// NewCLIParams creates a new CLIParams object from the config file.
+func NewCLIParams(context *cli.Context, rdwr ReadWriter) (*CLIParams, error) {
+	clusterConfig := recursiveFlagSearch(context, flags.ClusterConfigFlag)
+	profileConfig := recursiveFlagSearch(context, flags.ECSProfileFlag)
+	ecsConfig, err := rdwr.Get(clusterConfig, profileConfig)
+
 	if err != nil {
-		logrus.Error("Error loading config: ", err)
+		return nil, errors.Wrap(err, "Error loading config")
+	}
+
+	// launch type from the flag overrides defaul launch type
+	if launchTypeFromFlag := recursiveFlagSearch(context, flags.LaunchTypeFlag); launchTypeFromFlag != "" {
+		ecsConfig.DefaultLaunchType = launchTypeFromFlag
+	}
+
+	if err = ValidateLaunchType(ecsConfig.DefaultLaunchType); err != nil {
 		return nil, err
 	}
 
-	// If Prefixes not found, set to defaults.
-	if !rdwr.IsKeyPresent(ecsSectionKey, composeProjectNamePrefixKey) {
-		ecsConfig.ComposeProjectNamePrefix = ecscli.ComposeProjectNamePrefixDefaultValue
+	// Order of cluster resolution
+	//  1) Inline flag
+	//  2) Environment Variable
+	//  3) ECS Config
+	if clusterFromEnv := os.Getenv(flags.ClusterEnvVar); clusterFromEnv != "" {
+		ecsConfig.Cluster = clusterFromEnv
 	}
-	if !rdwr.IsKeyPresent(ecsSectionKey, composeServiceNamePrefixKey) {
-		ecsConfig.ComposeServiceNamePrefix = ecscli.ComposeServiceNamePrefixDefaultValue
-	}
-	if !rdwr.IsKeyPresent(ecsSectionKey, cfnStackNamePrefixKey) {
-		ecsConfig.CFNStackNamePrefix = ecscli.CFNStackNamePrefixDefaultValue
+	if clusterFromFlag := recursiveFlagSearch(context, flags.ClusterFlag); clusterFromFlag != "" {
+		ecsConfig.Cluster = clusterFromFlag
 	}
 
-	// The global --region flag has the highest precedence to set ecs-cli region config.
-	regionFromFlag := context.GlobalString(ecscli.RegionFlag)
-	if regionFromFlag != "" {
+	//--region flag has the highest precedence to set ecs-cli region config.
+	if regionFromFlag := recursiveFlagSearch(context, flags.RegionFlag); regionFromFlag != "" {
 		ecsConfig.Region = regionFromFlag
 	}
 
-	svcSession, err := ecsConfig.ToAWSSession()
+	if awsProfileFromFlag := recursiveFlagSearch(context, flags.AWSProfileFlag); awsProfileFromFlag != "" {
+		ecsConfig.AWSProfile = awsProfileFromFlag
+		// unset Access Key and Secret Key, otherwise they will take precedence
+		ecsConfig.AWSAccessKey = ""
+		ecsConfig.AWSSecretKey = ""
+	}
+
+	svcSession, err := ecsConfig.ToAWSSession(context)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CliParams{
+	if ecsConfig.Version == iniConfigVersion {
+		ecsConfig.CFNStackName = ecsConfig.CFNStackNamePrefix + ecsConfig.Cluster
+	}
+
+	if ecsConfig.CFNStackName == "" {
+		ecsConfig.CFNStackName = flags.CFNStackNamePrefixDefaultValue + ecsConfig.Cluster
+	}
+
+	return &CLIParams{
 		Cluster:                  ecsConfig.Cluster,
 		Session:                  svcSession,
-		ComposeProjectNamePrefix: ecsConfig.ComposeProjectNamePrefix,
 		ComposeServiceNamePrefix: ecsConfig.ComposeServiceNamePrefix,
-		CFNStackNamePrefix:       ecsConfig.CFNStackNamePrefix,
+		ComposeProjectNamePrefix: ecsConfig.ComposeProjectNamePrefix, // deprecated; remains for backwards compatibility
+		CFNStackName:             ecsConfig.CFNStackName,
+		LaunchType:               ecsConfig.DefaultLaunchType,
 	}, nil
+}
+
+// ValidateLaunchType checks that the launch type specified was an allowed value
+func ValidateLaunchType(launchType string) error {
+	if (launchType != "") && (launchType != LaunchTypeEC2) && (launchType != LaunchTypeFargate) {
+		return fmt.Errorf("Supported launch types are '%s' and '%s'; %s is not a valid launch type.", LaunchTypeEC2, LaunchTypeFargate, launchType)
+	}
+	return nil
 }

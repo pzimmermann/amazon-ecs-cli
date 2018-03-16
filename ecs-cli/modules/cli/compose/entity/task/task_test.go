@@ -14,7 +14,7 @@
 package task
 
 import (
-	"strings"
+	"flag"
 	"testing"
 
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/cli/compose/context"
@@ -24,6 +24,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli"
 )
 
 func TestTaskCreate(t *testing.T) {
@@ -42,37 +44,30 @@ func TestTaskCreate(t *testing.T) {
 	mockEcs.EXPECT().RegisterTaskDefinitionIfNeeded(gomock.Any(), gomock.Any()).Do(func(x, y interface{}) {
 		// verify input fields
 		req := x.(*ecs.RegisterTaskDefinitionInput)
-		if aws.StringValue(taskDefinition.Family) != aws.StringValue(req.Family) {
-			t.Errorf("Expected taskDefintion family to be [%s] but got [%s]",
-				aws.StringValue(taskDefinition.Family), aws.StringValue(req.Family))
-		}
+		assert.Equal(t, aws.StringValue(taskDefinition.Family), aws.StringValue(req.Family), "Expected Task Definition family to match.")
 	}).Return(&respTaskDef, nil)
 
+	flagSet := flag.NewFlagSet("ecs-cli", 0)
+	cliContext := cli.NewContext(nil, flagSet, nil)
+
 	context := &context.Context{
-		ECSClient: mockEcs,
-		ECSParams: &config.CliParams{},
+		ECSClient:  mockEcs,
+		CLIParams:  &config.CLIParams{},
+		CLIContext: cliContext,
 	}
 	task := NewTask(context)
 	task.SetTaskDefinition(&taskDefinition)
 
 	err := task.Create()
-	if err != nil {
-		t.Fatal("Unexpected error while create")
-	}
-	if aws.StringValue(respTaskDef.TaskDefinitionArn) != aws.StringValue(task.TaskDefinition().TaskDefinitionArn) {
-		t.Errorf("Expected task's TaskDefArn to be [%s] but got [%s]",
-			aws.StringValue(respTaskDef.TaskDefinitionArn), aws.StringValue(task.TaskDefinition().TaskDefinitionArn))
-	}
+	assert.NoError(t, err, "Unexpected error while create")
+	assert.Equal(t, aws.StringValue(respTaskDef.TaskDefinitionArn), aws.StringValue(task.TaskDefinition().TaskDefinitionArn), "Expected TaskDefArn to match.")
 }
 
 func TestTaskInfoFilterLocal(t *testing.T) {
 	entity.TestInfo(func(context *context.Context) entity.ProjectEntity {
 		return NewTask(context)
 	}, func(req *ecs.ListTasksInput, projectName string, t *testing.T) {
-		if !strings.Contains(aws.StringValue(req.StartedBy), projectName) {
-			t.Errorf("Expected startedby to contain projectName [%s] but got [%s]",
-				projectName, aws.StringValue(req.StartedBy))
-		}
+		assert.Equal(t, projectName, aws.StringValue(req.Family), "Expected Task Definition Family to be project name")
 	}, t, true)
 }
 
@@ -80,9 +75,9 @@ func TestTaskInfoAll(t *testing.T) {
 	entity.TestInfo(func(context *context.Context) entity.ProjectEntity {
 		return NewTask(context)
 	}, func(req *ecs.ListTasksInput, projectName string, t *testing.T) {
-		if req.StartedBy != nil {
-			t.Error("Expected startedby to be not set")
-		}
+		assert.Nil(t, req.StartedBy, "Unexpected filter on StartedBy")
+		assert.Nil(t, req.Family, "Unexpected filter on Task Definition family")
+		assert.Nil(t, req.ServiceName, "Unexpected filter on Service Name")
 	}, t, false)
 }
 

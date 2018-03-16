@@ -17,14 +17,14 @@ import (
 	"flag"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
-	command "github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	log "github.com/sirupsen/logrus"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/urfave/cli"
 )
 
 func TestBeforeApp(t *testing.T) {
 	flagSet := flag.NewFlagSet("ecs-cli", 0)
-	flagSet.Bool(command.VerboseFlag, true, "")
+	flagSet.Bool(flags.VerboseFlag, true, "")
 	cliContext := cli.NewContext(nil, flagSet, nil)
 
 	BeforeApp(cliContext)

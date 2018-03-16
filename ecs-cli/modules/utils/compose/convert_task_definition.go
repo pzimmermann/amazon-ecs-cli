@@ -15,18 +15,18 @@ package utils
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/docker/libcompose/config"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/yaml"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -44,7 +44,7 @@ var supportedComposeYamlOptions = []string{
 	"cpu_shares", "command", "dns", "dns_search", "entrypoint", "env_file",
 	"environment", "extra_hosts", "hostname", "image", "labels", "links",
 	"logging", "log_driver", "log_opt", "mem_limit", "mem_reservation", "ports", "privileged", "read_only",
-	"security_opt", "ulimits", "user", "volumes", "volumes_from", "working_dir",
+	"security_opt", "ulimits", "user", "volumes", "volumes_from", "working_dir", "cap_add", "cap_drop",
 }
 
 var supportedComposeYamlOptionsMap = getSupportedComposeYamlOptionsMap()
@@ -62,9 +62,18 @@ func getSupportedComposeYamlOptionsMap() map[string]bool {
 	return optionsMap
 }
 
+type TaskDefParams struct {
+	networkMode      string
+	taskRoleArn      string
+	cpu              string
+	memory           string
+	containerDefs    ContainerDefs
+	executionRoleArn string
+}
+
 // ConvertToTaskDefinition transforms the yaml configs to its ecs equivalent (task definition)
 func ConvertToTaskDefinition(taskDefinitionName string, context *project.Context,
-	serviceConfigs *config.ServiceConfigs) (*ecs.TaskDefinition, error) {
+	serviceConfigs *config.ServiceConfigs, taskRoleArn string, requiredCompatibilites string, ecsParams *ECSParams) (*ecs.TaskDefinition, error) {
 
 	if serviceConfigs.Len() == 0 {
 		return nil, errors.New("cannot create a task definition with no containers; invalid service config")
@@ -72,6 +81,18 @@ func ConvertToTaskDefinition(taskDefinitionName string, context *project.Context
 
 	logUnsupportedConfigFields(context.Project)
 
+	// Instantiates zero values for fields on task def specified by ecs-params
+	taskDefParams, err := convertTaskDefParams(ecsParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// The task-role-arn flag takes precedence over a taskRoleArn value specified in ecs-params file.
+	if taskRoleArn == "" {
+		taskRoleArn = taskDefParams.taskRoleArn
+	}
+
+	// Create containerDefinitions
 	containerDefinitions := []*ecs.ContainerDefinition{}
 	volumes := &volumes{
 		volumeWithHost: make(map[string]string), // map with key:=hostSourcePath value:=VolumeName
@@ -86,9 +107,24 @@ func ConvertToTaskDefinition(taskDefinitionName string, context *project.Context
 		containerDef := &ecs.ContainerDefinition{
 			Name: aws.String(name),
 		}
-		if err := convertToContainerDef(context, serviceConfig, volumes, containerDef); err != nil {
+
+		// Check if there are ecs-params specified for the container
+		ecsContainerDef := &ContainerDef{Essential: true}
+
+		if cd, ok := taskDefParams.containerDefs[name]; ok {
+			ecsContainerDef = &cd
+		}
+
+		count := len(serviceConfigs.Keys())
+
+		if !hasEssential(taskDefParams.containerDefs, count) {
+			return nil, errors.New("Task definition does not have any essential containers.")
+		}
+
+		if err := convertToContainerDef(context, serviceConfig, volumes, containerDef, ecsContainerDef); err != nil {
 			return nil, err
 		}
+
 		containerDefinitions = append(containerDefinitions, containerDef)
 	}
 
@@ -96,7 +132,17 @@ func ConvertToTaskDefinition(taskDefinitionName string, context *project.Context
 		Family:               aws.String(taskDefinitionName),
 		ContainerDefinitions: containerDefinitions,
 		Volumes:              convertToECSVolumes(volumes),
+		TaskRoleArn:          aws.String(taskRoleArn),
+		NetworkMode:          aws.String(taskDefParams.networkMode),
+		Cpu:                  aws.String(taskDefParams.cpu),
+		Memory:               aws.String(taskDefParams.memory),
+		ExecutionRoleArn:     aws.String(taskDefParams.executionRoleArn),
 	}
+
+	if requiredCompatibilites != "" {
+		taskDefinition.RequiresCompatibilities = []*string{aws.String(requiredCompatibilites)}
+	}
+
 	return taskDefinition, nil
 }
 
@@ -105,7 +151,10 @@ func logUnsupportedConfigFields(project *project.Project) {
 	if project.VolumeConfigs != nil && len(project.VolumeConfigs) > 0 {
 		log.WithFields(log.Fields{"option name": "volumes"}).Warn("Skipping unsupported YAML option...")
 	}
-	if project.NetworkConfigs != nil && len(project.NetworkConfigs) > 0 {
+	// ecsProject#parseCompose, which calls the underlying libcompose.Project#Parse(),
+	// always populates the project.NetworkConfig with one entry ("default").
+	// See: https://github.com/docker/libcompose/blob/master/project/project.go#L277
+	if project.NetworkConfigs != nil && len(project.NetworkConfigs) > 1 {
 		log.WithFields(log.Fields{"option name": "networks"}).Warn("Skipping unsupported YAML option...")
 	}
 }
@@ -128,15 +177,36 @@ func logUnsupportedServiceConfigFields(serviceName string, config *config.Servic
 			}
 		}
 
+		if tagName == "networks" && !validNetworksForService(config) {
+			log.WithFields(log.Fields{
+				"option name":  tagName,
+				"service name": serviceName,
+			}).Warn("Skipping unsupported YAML option for service...")
+		}
+
 		zeroValue := isZero(field)
 		// if value is present for the field that is not in supportedYamlTags map, log a warning
-		if !zeroValue && !supportedComposeYamlOptionsMap[tagName] {
+		if tagName != "networks" && !zeroValue && !supportedComposeYamlOptionsMap[tagName] {
 			log.WithFields(log.Fields{
 				"option name":  tagName,
 				"service name": serviceName,
 			}).Warn("Skipping unsupported YAML option for service...")
 		}
 	}
+}
+
+func validNetworksForService(config *config.ServiceConfig) bool {
+	if config.Networks == nil {
+		return false
+	}
+	if config.Networks.Networks == nil {
+		return false
+	}
+	if len(config.Networks.Networks) != 1 {
+		return false
+	}
+
+	return true
 }
 
 // isZero checks if the value is nil or empty or zero
@@ -165,7 +235,7 @@ func isZero(v reflect.Value) bool {
 // convertToContainerDef transforms each service in the compose yml
 // to an equivalent container definition
 func convertToContainerDef(context *project.Context, inputCfg *config.ServiceConfig,
-	volumes *volumes, outputContDef *ecs.ContainerDefinition) error {
+	volumes *volumes, outputContDef *ecs.ContainerDefinition, ecsContainerDef *ContainerDef) error {
 	// setting memory
 	var mem int64
 	var memoryReservation int64
@@ -260,6 +330,18 @@ func convertToContainerDef(context *project.Context, inputCfg *config.ServiceCon
 	outputContDef.VolumesFrom = volumesFrom
 	if inputCfg.WorkingDir != "" {
 		outputContDef.WorkingDirectory = aws.String(inputCfg.WorkingDir)
+	}
+
+	outputContDef.LinuxParameters = &ecs.LinuxParameters{Capabilities: &ecs.KernelCapabilities{}}
+	if inputCfg.CapAdd != nil {
+		outputContDef.LinuxParameters.Capabilities.SetAdd(aws.StringSlice(inputCfg.CapAdd))
+	}
+	if inputCfg.CapDrop != nil {
+		outputContDef.LinuxParameters.Capabilities.SetDrop(aws.StringSlice(inputCfg.CapDrop))
+	}
+
+	if ecsContainerDef != nil {
+		outputContDef.Essential = aws.Bool(ecsContainerDef.Essential)
 	}
 
 	return nil
@@ -539,4 +621,46 @@ func SortedGoString(v interface{}) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func hasEssential(ecsParamsContainerDefs ContainerDefs, count int) bool {
+	// If the customer does not set the "essential" field on any container
+	// definition, ECS will mark all containers in a TaskDefinition as
+	// essential. Previously, since the customer could not pass in the
+	// essential field, Task Definitions created through the CLI marked all
+	// containers as essential.
+
+	// Now that the essential field can  be set by the customer via the
+	// the ecs-params.yml file, we want to make sure that there is still at
+	// least one essential container, i.e. that the customer does not
+	// explicitly set all containers to be non-essential.
+
+	nonEssentialCount := 0
+
+	for _, containerDef := range ecsParamsContainerDefs {
+		if !containerDef.Essential {
+			nonEssentialCount += 1
+		}
+	}
+
+	// 'count' is the total number of containers specified in the service config
+	return nonEssentialCount != count
+}
+
+// Converts fields from ecsParams into the appropriate types for fields on an
+// ECS Task Definition
+func convertTaskDefParams(ecsParams *ECSParams) (params TaskDefParams, e error) {
+	if ecsParams == nil {
+		return params, nil
+	}
+
+	taskDef := ecsParams.TaskDefinition
+	params.networkMode = taskDef.NetworkMode
+	params.taskRoleArn = taskDef.TaskRoleArn
+	params.containerDefs = taskDef.ContainerDefinitions
+	params.cpu = taskDef.TaskSize.Cpu
+	params.memory = taskDef.TaskSize.Memory
+	params.executionRoleArn = taskDef.ExecutionRole
+
+	return params, nil
 }

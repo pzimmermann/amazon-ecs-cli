@@ -23,17 +23,20 @@ import (
 
 // Parameter Key Names used by the template.
 const (
-	ParameterKeyAsgMaxSize    = "AsgMaxSize"
-	ParameterKeyVPCAzs        = "VpcAvailabilityZones"
-	ParameterKeySecurityGroup = "SecurityGroup"
-	ParameterKeySourceCidr    = "SourceCidr"
-	ParameterKeyEcsPort       = "EcsPort"
-	ParameterKeySubnetIds     = "SubnetIds"
-	ParameterKeyVpcId         = "VpcId"
-	ParameterKeyInstanceType  = "EcsInstanceType"
-	ParameterKeyKeyPairName   = "KeyName"
-	ParameterKeyCluster       = "EcsCluster"
-	ParameterKeyAmiId         = "EcsAmiId"
+	ParameterKeyAsgMaxSize               = "AsgMaxSize"
+	ParameterKeyVPCAzs                   = "VpcAvailabilityZones"
+	ParameterKeySecurityGroup            = "SecurityGroupIds"
+	ParameterKeySourceCidr               = "SourceCidr"
+	ParameterKeyEcsPort                  = "EcsPort"
+	ParameterKeySubnetIds                = "SubnetIds"
+	ParameterKeyVpcId                    = "VpcId"
+	ParameterKeyInstanceType             = "EcsInstanceType"
+	ParameterKeyKeyPairName              = "KeyName"
+	ParameterKeyCluster                  = "EcsCluster"
+	ParameterKeyAmiId                    = "EcsAmiId"
+	ParameterKeyAssociatePublicIPAddress = "AssociatePublicIpAddress"
+	ParameterKeyInstanceRole             = "InstanceRole"
+	ParameterKeyIsFargate                = "IsFargate"
 )
 
 var ParameterNotFoundError = errors.New("Parameter not found")
@@ -49,7 +52,7 @@ var requiredParameters map[string]bool
 var parameterKeyNames []string
 
 func init() {
-	requiredParameterNames = []string{ParameterKeyKeyPairName, ParameterKeyCluster, ParameterKeyAmiId}
+	requiredParameterNames = []string{ParameterKeyCluster, ParameterKeyAmiId}
 	requiredParameters = make(map[string]bool)
 	for _, s := range requiredParameterNames {
 		requiredParameters[s] = true
@@ -67,6 +70,7 @@ func init() {
 		ParameterKeyKeyPairName,
 		ParameterKeyCluster,
 		ParameterKeyAmiId,
+		ParameterKeyAssociatePublicIPAddress,
 	}
 }
 
@@ -85,13 +89,16 @@ func NewCfnStackParams() *CfnStackParams {
 }
 
 // NewCfnStackParamsForUpdate creates a new object of CfnStackParams struct and populates it for updating the stack.
-func NewCfnStackParamsForUpdate() *CfnStackParams {
+func NewCfnStackParamsForUpdate(existingParams []*cloudformation.Parameter) (*CfnStackParams, error) {
 	params := NewCfnStackParams()
-	for _, key := range parameterKeyNames {
+	for _, param := range existingParams {
 		// Set UsePreviousValue = true for all the stack parameters.
-		params.AddWithUsePreviousValue(key, true)
+		err := params.AddWithUsePreviousValue(aws.StringValue(param.ParameterKey), true)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return params
+	return params, nil
 }
 
 // Add adds a key and the value for the same to the cloudformation parameters. If the key already

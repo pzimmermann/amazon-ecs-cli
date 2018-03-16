@@ -17,6 +17,7 @@
 package mock_ecriface
 
 import (
+	aws "github.com/aws/aws-sdk-go/aws"
 	request "github.com/aws/aws-sdk-go/aws/request"
 	ecr "github.com/aws/aws-sdk-go/service/ecr"
 	gomock "github.com/golang/mock/gomock"
@@ -65,6 +66,22 @@ func (_mr *_MockECRAPIRecorder) BatchCheckLayerAvailabilityRequest(arg0 interfac
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchCheckLayerAvailabilityRequest", arg0)
 }
 
+func (_m *MockECRAPI) BatchCheckLayerAvailabilityWithContext(_param0 aws.Context, _param1 *ecr.BatchCheckLayerAvailabilityInput, _param2 ...request.Option) (*ecr.BatchCheckLayerAvailabilityOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "BatchCheckLayerAvailabilityWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.BatchCheckLayerAvailabilityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) BatchCheckLayerAvailabilityWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchCheckLayerAvailabilityWithContext", _s...)
+}
+
 func (_m *MockECRAPI) BatchDeleteImage(_param0 *ecr.BatchDeleteImageInput) (*ecr.BatchDeleteImageOutput, error) {
 	ret := _m.ctrl.Call(_m, "BatchDeleteImage", _param0)
 	ret0, _ := ret[0].(*ecr.BatchDeleteImageOutput)
@@ -85,6 +102,22 @@ func (_m *MockECRAPI) BatchDeleteImageRequest(_param0 *ecr.BatchDeleteImageInput
 
 func (_mr *_MockECRAPIRecorder) BatchDeleteImageRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchDeleteImageRequest", arg0)
+}
+
+func (_m *MockECRAPI) BatchDeleteImageWithContext(_param0 aws.Context, _param1 *ecr.BatchDeleteImageInput, _param2 ...request.Option) (*ecr.BatchDeleteImageOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "BatchDeleteImageWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.BatchDeleteImageOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) BatchDeleteImageWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchDeleteImageWithContext", _s...)
 }
 
 func (_m *MockECRAPI) BatchGetImage(_param0 *ecr.BatchGetImageInput) (*ecr.BatchGetImageOutput, error) {
@@ -109,6 +142,22 @@ func (_mr *_MockECRAPIRecorder) BatchGetImageRequest(arg0 interface{}) *gomock.C
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchGetImageRequest", arg0)
 }
 
+func (_m *MockECRAPI) BatchGetImageWithContext(_param0 aws.Context, _param1 *ecr.BatchGetImageInput, _param2 ...request.Option) (*ecr.BatchGetImageOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "BatchGetImageWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.BatchGetImageOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) BatchGetImageWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "BatchGetImageWithContext", _s...)
+}
+
 func (_m *MockECRAPI) CompleteLayerUpload(_param0 *ecr.CompleteLayerUploadInput) (*ecr.CompleteLayerUploadOutput, error) {
 	ret := _m.ctrl.Call(_m, "CompleteLayerUpload", _param0)
 	ret0, _ := ret[0].(*ecr.CompleteLayerUploadOutput)
@@ -131,6 +180,22 @@ func (_mr *_MockECRAPIRecorder) CompleteLayerUploadRequest(arg0 interface{}) *go
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CompleteLayerUploadRequest", arg0)
 }
 
+func (_m *MockECRAPI) CompleteLayerUploadWithContext(_param0 aws.Context, _param1 *ecr.CompleteLayerUploadInput, _param2 ...request.Option) (*ecr.CompleteLayerUploadOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "CompleteLayerUploadWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.CompleteLayerUploadOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) CompleteLayerUploadWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CompleteLayerUploadWithContext", _s...)
+}
+
 func (_m *MockECRAPI) CreateRepository(_param0 *ecr.CreateRepositoryInput) (*ecr.CreateRepositoryOutput, error) {
 	ret := _m.ctrl.Call(_m, "CreateRepository", _param0)
 	ret0, _ := ret[0].(*ecr.CreateRepositoryOutput)
@@ -151,6 +216,60 @@ func (_m *MockECRAPI) CreateRepositoryRequest(_param0 *ecr.CreateRepositoryInput
 
 func (_mr *_MockECRAPIRecorder) CreateRepositoryRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateRepositoryRequest", arg0)
+}
+
+func (_m *MockECRAPI) CreateRepositoryWithContext(_param0 aws.Context, _param1 *ecr.CreateRepositoryInput, _param2 ...request.Option) (*ecr.CreateRepositoryOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "CreateRepositoryWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.CreateRepositoryOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) CreateRepositoryWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "CreateRepositoryWithContext", _s...)
+}
+
+func (_m *MockECRAPI) DeleteLifecyclePolicy(_param0 *ecr.DeleteLifecyclePolicyInput) (*ecr.DeleteLifecyclePolicyOutput, error) {
+	ret := _m.ctrl.Call(_m, "DeleteLifecyclePolicy", _param0)
+	ret0, _ := ret[0].(*ecr.DeleteLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DeleteLifecyclePolicy(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteLifecyclePolicy", arg0)
+}
+
+func (_m *MockECRAPI) DeleteLifecyclePolicyRequest(_param0 *ecr.DeleteLifecyclePolicyInput) (*request.Request, *ecr.DeleteLifecyclePolicyOutput) {
+	ret := _m.ctrl.Call(_m, "DeleteLifecyclePolicyRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ecr.DeleteLifecyclePolicyOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DeleteLifecyclePolicyRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteLifecyclePolicyRequest", arg0)
+}
+
+func (_m *MockECRAPI) DeleteLifecyclePolicyWithContext(_param0 aws.Context, _param1 *ecr.DeleteLifecyclePolicyInput, _param2 ...request.Option) (*ecr.DeleteLifecyclePolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DeleteLifecyclePolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.DeleteLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DeleteLifecyclePolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteLifecyclePolicyWithContext", _s...)
 }
 
 func (_m *MockECRAPI) DeleteRepository(_param0 *ecr.DeleteRepositoryInput) (*ecr.DeleteRepositoryOutput, error) {
@@ -186,6 +305,22 @@ func (_mr *_MockECRAPIRecorder) DeleteRepositoryPolicyRequest(arg0 interface{}) 
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteRepositoryPolicyRequest", arg0)
 }
 
+func (_m *MockECRAPI) DeleteRepositoryPolicyWithContext(_param0 aws.Context, _param1 *ecr.DeleteRepositoryPolicyInput, _param2 ...request.Option) (*ecr.DeleteRepositoryPolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DeleteRepositoryPolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.DeleteRepositoryPolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DeleteRepositoryPolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteRepositoryPolicyWithContext", _s...)
+}
+
 func (_m *MockECRAPI) DeleteRepositoryRequest(_param0 *ecr.DeleteRepositoryInput) (*request.Request, *ecr.DeleteRepositoryOutput) {
 	ret := _m.ctrl.Call(_m, "DeleteRepositoryRequest", _param0)
 	ret0, _ := ret[0].(*request.Request)
@@ -195,6 +330,22 @@ func (_m *MockECRAPI) DeleteRepositoryRequest(_param0 *ecr.DeleteRepositoryInput
 
 func (_mr *_MockECRAPIRecorder) DeleteRepositoryRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteRepositoryRequest", arg0)
+}
+
+func (_m *MockECRAPI) DeleteRepositoryWithContext(_param0 aws.Context, _param1 *ecr.DeleteRepositoryInput, _param2 ...request.Option) (*ecr.DeleteRepositoryOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DeleteRepositoryWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.DeleteRepositoryOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DeleteRepositoryWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DeleteRepositoryWithContext", _s...)
 }
 
 func (_m *MockECRAPI) DescribeImages(_param0 *ecr.DescribeImagesInput) (*ecr.DescribeImagesOutput, error) {
@@ -218,6 +369,21 @@ func (_mr *_MockECRAPIRecorder) DescribeImagesPages(arg0, arg1 interface{}) *gom
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeImagesPages", arg0, arg1)
 }
 
+func (_m *MockECRAPI) DescribeImagesPagesWithContext(_param0 aws.Context, _param1 *ecr.DescribeImagesInput, _param2 func(*ecr.DescribeImagesOutput, bool) bool, _param3 ...request.Option) error {
+	_s := []interface{}{_param0, _param1, _param2}
+	for _, _x := range _param3 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DescribeImagesPagesWithContext", _s...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockECRAPIRecorder) DescribeImagesPagesWithContext(arg0, arg1, arg2 interface{}, arg3 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1, arg2}, arg3...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeImagesPagesWithContext", _s...)
+}
+
 func (_m *MockECRAPI) DescribeImagesRequest(_param0 *ecr.DescribeImagesInput) (*request.Request, *ecr.DescribeImagesOutput) {
 	ret := _m.ctrl.Call(_m, "DescribeImagesRequest", _param0)
 	ret0, _ := ret[0].(*request.Request)
@@ -227,6 +393,22 @@ func (_m *MockECRAPI) DescribeImagesRequest(_param0 *ecr.DescribeImagesInput) (*
 
 func (_mr *_MockECRAPIRecorder) DescribeImagesRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeImagesRequest", arg0)
+}
+
+func (_m *MockECRAPI) DescribeImagesWithContext(_param0 aws.Context, _param1 *ecr.DescribeImagesInput, _param2 ...request.Option) (*ecr.DescribeImagesOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DescribeImagesWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.DescribeImagesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DescribeImagesWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeImagesWithContext", _s...)
 }
 
 func (_m *MockECRAPI) DescribeRepositories(_param0 *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
@@ -250,6 +432,21 @@ func (_mr *_MockECRAPIRecorder) DescribeRepositoriesPages(arg0, arg1 interface{}
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeRepositoriesPages", arg0, arg1)
 }
 
+func (_m *MockECRAPI) DescribeRepositoriesPagesWithContext(_param0 aws.Context, _param1 *ecr.DescribeRepositoriesInput, _param2 func(*ecr.DescribeRepositoriesOutput, bool) bool, _param3 ...request.Option) error {
+	_s := []interface{}{_param0, _param1, _param2}
+	for _, _x := range _param3 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DescribeRepositoriesPagesWithContext", _s...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockECRAPIRecorder) DescribeRepositoriesPagesWithContext(arg0, arg1, arg2 interface{}, arg3 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1, arg2}, arg3...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeRepositoriesPagesWithContext", _s...)
+}
+
 func (_m *MockECRAPI) DescribeRepositoriesRequest(_param0 *ecr.DescribeRepositoriesInput) (*request.Request, *ecr.DescribeRepositoriesOutput) {
 	ret := _m.ctrl.Call(_m, "DescribeRepositoriesRequest", _param0)
 	ret0, _ := ret[0].(*request.Request)
@@ -259,6 +456,22 @@ func (_m *MockECRAPI) DescribeRepositoriesRequest(_param0 *ecr.DescribeRepositor
 
 func (_mr *_MockECRAPIRecorder) DescribeRepositoriesRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeRepositoriesRequest", arg0)
+}
+
+func (_m *MockECRAPI) DescribeRepositoriesWithContext(_param0 aws.Context, _param1 *ecr.DescribeRepositoriesInput, _param2 ...request.Option) (*ecr.DescribeRepositoriesOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "DescribeRepositoriesWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.DescribeRepositoriesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) DescribeRepositoriesWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "DescribeRepositoriesWithContext", _s...)
 }
 
 func (_m *MockECRAPI) GetAuthorizationToken(_param0 *ecr.GetAuthorizationTokenInput) (*ecr.GetAuthorizationTokenOutput, error) {
@@ -283,6 +496,22 @@ func (_mr *_MockECRAPIRecorder) GetAuthorizationTokenRequest(arg0 interface{}) *
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetAuthorizationTokenRequest", arg0)
 }
 
+func (_m *MockECRAPI) GetAuthorizationTokenWithContext(_param0 aws.Context, _param1 *ecr.GetAuthorizationTokenInput, _param2 ...request.Option) (*ecr.GetAuthorizationTokenOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "GetAuthorizationTokenWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.GetAuthorizationTokenOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetAuthorizationTokenWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetAuthorizationTokenWithContext", _s...)
+}
+
 func (_m *MockECRAPI) GetDownloadUrlForLayer(_param0 *ecr.GetDownloadUrlForLayerInput) (*ecr.GetDownloadUrlForLayerOutput, error) {
 	ret := _m.ctrl.Call(_m, "GetDownloadUrlForLayer", _param0)
 	ret0, _ := ret[0].(*ecr.GetDownloadUrlForLayerOutput)
@@ -303,6 +532,98 @@ func (_m *MockECRAPI) GetDownloadUrlForLayerRequest(_param0 *ecr.GetDownloadUrlF
 
 func (_mr *_MockECRAPIRecorder) GetDownloadUrlForLayerRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetDownloadUrlForLayerRequest", arg0)
+}
+
+func (_m *MockECRAPI) GetDownloadUrlForLayerWithContext(_param0 aws.Context, _param1 *ecr.GetDownloadUrlForLayerInput, _param2 ...request.Option) (*ecr.GetDownloadUrlForLayerOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "GetDownloadUrlForLayerWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.GetDownloadUrlForLayerOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetDownloadUrlForLayerWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetDownloadUrlForLayerWithContext", _s...)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicy(_param0 *ecr.GetLifecyclePolicyInput) (*ecr.GetLifecyclePolicyOutput, error) {
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicy", _param0)
+	ret0, _ := ret[0].(*ecr.GetLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicy(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicy", arg0)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicyPreview(_param0 *ecr.GetLifecyclePolicyPreviewInput) (*ecr.GetLifecyclePolicyPreviewOutput, error) {
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicyPreview", _param0)
+	ret0, _ := ret[0].(*ecr.GetLifecyclePolicyPreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicyPreview(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicyPreview", arg0)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicyPreviewRequest(_param0 *ecr.GetLifecyclePolicyPreviewInput) (*request.Request, *ecr.GetLifecyclePolicyPreviewOutput) {
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicyPreviewRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ecr.GetLifecyclePolicyPreviewOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicyPreviewRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicyPreviewRequest", arg0)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicyPreviewWithContext(_param0 aws.Context, _param1 *ecr.GetLifecyclePolicyPreviewInput, _param2 ...request.Option) (*ecr.GetLifecyclePolicyPreviewOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicyPreviewWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.GetLifecyclePolicyPreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicyPreviewWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicyPreviewWithContext", _s...)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicyRequest(_param0 *ecr.GetLifecyclePolicyInput) (*request.Request, *ecr.GetLifecyclePolicyOutput) {
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicyRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ecr.GetLifecyclePolicyOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicyRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicyRequest", arg0)
+}
+
+func (_m *MockECRAPI) GetLifecyclePolicyWithContext(_param0 aws.Context, _param1 *ecr.GetLifecyclePolicyInput, _param2 ...request.Option) (*ecr.GetLifecyclePolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "GetLifecyclePolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.GetLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetLifecyclePolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetLifecyclePolicyWithContext", _s...)
 }
 
 func (_m *MockECRAPI) GetRepositoryPolicy(_param0 *ecr.GetRepositoryPolicyInput) (*ecr.GetRepositoryPolicyOutput, error) {
@@ -327,6 +648,22 @@ func (_mr *_MockECRAPIRecorder) GetRepositoryPolicyRequest(arg0 interface{}) *go
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetRepositoryPolicyRequest", arg0)
 }
 
+func (_m *MockECRAPI) GetRepositoryPolicyWithContext(_param0 aws.Context, _param1 *ecr.GetRepositoryPolicyInput, _param2 ...request.Option) (*ecr.GetRepositoryPolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "GetRepositoryPolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.GetRepositoryPolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) GetRepositoryPolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetRepositoryPolicyWithContext", _s...)
+}
+
 func (_m *MockECRAPI) InitiateLayerUpload(_param0 *ecr.InitiateLayerUploadInput) (*ecr.InitiateLayerUploadOutput, error) {
 	ret := _m.ctrl.Call(_m, "InitiateLayerUpload", _param0)
 	ret0, _ := ret[0].(*ecr.InitiateLayerUploadOutput)
@@ -347,6 +684,22 @@ func (_m *MockECRAPI) InitiateLayerUploadRequest(_param0 *ecr.InitiateLayerUploa
 
 func (_mr *_MockECRAPIRecorder) InitiateLayerUploadRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "InitiateLayerUploadRequest", arg0)
+}
+
+func (_m *MockECRAPI) InitiateLayerUploadWithContext(_param0 aws.Context, _param1 *ecr.InitiateLayerUploadInput, _param2 ...request.Option) (*ecr.InitiateLayerUploadOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "InitiateLayerUploadWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.InitiateLayerUploadOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) InitiateLayerUploadWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "InitiateLayerUploadWithContext", _s...)
 }
 
 func (_m *MockECRAPI) ListImages(_param0 *ecr.ListImagesInput) (*ecr.ListImagesOutput, error) {
@@ -370,6 +723,21 @@ func (_mr *_MockECRAPIRecorder) ListImagesPages(arg0, arg1 interface{}) *gomock.
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListImagesPages", arg0, arg1)
 }
 
+func (_m *MockECRAPI) ListImagesPagesWithContext(_param0 aws.Context, _param1 *ecr.ListImagesInput, _param2 func(*ecr.ListImagesOutput, bool) bool, _param3 ...request.Option) error {
+	_s := []interface{}{_param0, _param1, _param2}
+	for _, _x := range _param3 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "ListImagesPagesWithContext", _s...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockECRAPIRecorder) ListImagesPagesWithContext(arg0, arg1, arg2 interface{}, arg3 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1, arg2}, arg3...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListImagesPagesWithContext", _s...)
+}
+
 func (_m *MockECRAPI) ListImagesRequest(_param0 *ecr.ListImagesInput) (*request.Request, *ecr.ListImagesOutput) {
 	ret := _m.ctrl.Call(_m, "ListImagesRequest", _param0)
 	ret0, _ := ret[0].(*request.Request)
@@ -379,6 +747,22 @@ func (_m *MockECRAPI) ListImagesRequest(_param0 *ecr.ListImagesInput) (*request.
 
 func (_mr *_MockECRAPIRecorder) ListImagesRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListImagesRequest", arg0)
+}
+
+func (_m *MockECRAPI) ListImagesWithContext(_param0 aws.Context, _param1 *ecr.ListImagesInput, _param2 ...request.Option) (*ecr.ListImagesOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "ListImagesWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.ListImagesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) ListImagesWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ListImagesWithContext", _s...)
 }
 
 func (_m *MockECRAPI) PutImage(_param0 *ecr.PutImageInput) (*ecr.PutImageOutput, error) {
@@ -403,6 +787,60 @@ func (_mr *_MockECRAPIRecorder) PutImageRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "PutImageRequest", arg0)
 }
 
+func (_m *MockECRAPI) PutImageWithContext(_param0 aws.Context, _param1 *ecr.PutImageInput, _param2 ...request.Option) (*ecr.PutImageOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "PutImageWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.PutImageOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) PutImageWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PutImageWithContext", _s...)
+}
+
+func (_m *MockECRAPI) PutLifecyclePolicy(_param0 *ecr.PutLifecyclePolicyInput) (*ecr.PutLifecyclePolicyOutput, error) {
+	ret := _m.ctrl.Call(_m, "PutLifecyclePolicy", _param0)
+	ret0, _ := ret[0].(*ecr.PutLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) PutLifecyclePolicy(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PutLifecyclePolicy", arg0)
+}
+
+func (_m *MockECRAPI) PutLifecyclePolicyRequest(_param0 *ecr.PutLifecyclePolicyInput) (*request.Request, *ecr.PutLifecyclePolicyOutput) {
+	ret := _m.ctrl.Call(_m, "PutLifecyclePolicyRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ecr.PutLifecyclePolicyOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) PutLifecyclePolicyRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PutLifecyclePolicyRequest", arg0)
+}
+
+func (_m *MockECRAPI) PutLifecyclePolicyWithContext(_param0 aws.Context, _param1 *ecr.PutLifecyclePolicyInput, _param2 ...request.Option) (*ecr.PutLifecyclePolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "PutLifecyclePolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.PutLifecyclePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) PutLifecyclePolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "PutLifecyclePolicyWithContext", _s...)
+}
+
 func (_m *MockECRAPI) SetRepositoryPolicy(_param0 *ecr.SetRepositoryPolicyInput) (*ecr.SetRepositoryPolicyOutput, error) {
 	ret := _m.ctrl.Call(_m, "SetRepositoryPolicy", _param0)
 	ret0, _ := ret[0].(*ecr.SetRepositoryPolicyOutput)
@@ -425,6 +863,60 @@ func (_mr *_MockECRAPIRecorder) SetRepositoryPolicyRequest(arg0 interface{}) *go
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetRepositoryPolicyRequest", arg0)
 }
 
+func (_m *MockECRAPI) SetRepositoryPolicyWithContext(_param0 aws.Context, _param1 *ecr.SetRepositoryPolicyInput, _param2 ...request.Option) (*ecr.SetRepositoryPolicyOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "SetRepositoryPolicyWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.SetRepositoryPolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) SetRepositoryPolicyWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetRepositoryPolicyWithContext", _s...)
+}
+
+func (_m *MockECRAPI) StartLifecyclePolicyPreview(_param0 *ecr.StartLifecyclePolicyPreviewInput) (*ecr.StartLifecyclePolicyPreviewOutput, error) {
+	ret := _m.ctrl.Call(_m, "StartLifecyclePolicyPreview", _param0)
+	ret0, _ := ret[0].(*ecr.StartLifecyclePolicyPreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) StartLifecyclePolicyPreview(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "StartLifecyclePolicyPreview", arg0)
+}
+
+func (_m *MockECRAPI) StartLifecyclePolicyPreviewRequest(_param0 *ecr.StartLifecyclePolicyPreviewInput) (*request.Request, *ecr.StartLifecyclePolicyPreviewOutput) {
+	ret := _m.ctrl.Call(_m, "StartLifecyclePolicyPreviewRequest", _param0)
+	ret0, _ := ret[0].(*request.Request)
+	ret1, _ := ret[1].(*ecr.StartLifecyclePolicyPreviewOutput)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) StartLifecyclePolicyPreviewRequest(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "StartLifecyclePolicyPreviewRequest", arg0)
+}
+
+func (_m *MockECRAPI) StartLifecyclePolicyPreviewWithContext(_param0 aws.Context, _param1 *ecr.StartLifecyclePolicyPreviewInput, _param2 ...request.Option) (*ecr.StartLifecyclePolicyPreviewOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "StartLifecyclePolicyPreviewWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.StartLifecyclePolicyPreviewOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) StartLifecyclePolicyPreviewWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "StartLifecyclePolicyPreviewWithContext", _s...)
+}
+
 func (_m *MockECRAPI) UploadLayerPart(_param0 *ecr.UploadLayerPartInput) (*ecr.UploadLayerPartOutput, error) {
 	ret := _m.ctrl.Call(_m, "UploadLayerPart", _param0)
 	ret0, _ := ret[0].(*ecr.UploadLayerPartOutput)
@@ -445,4 +937,20 @@ func (_m *MockECRAPI) UploadLayerPartRequest(_param0 *ecr.UploadLayerPartInput) 
 
 func (_mr *_MockECRAPIRecorder) UploadLayerPartRequest(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "UploadLayerPartRequest", arg0)
+}
+
+func (_m *MockECRAPI) UploadLayerPartWithContext(_param0 aws.Context, _param1 *ecr.UploadLayerPartInput, _param2 ...request.Option) (*ecr.UploadLayerPartOutput, error) {
+	_s := []interface{}{_param0, _param1}
+	for _, _x := range _param2 {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "UploadLayerPartWithContext", _s...)
+	ret0, _ := ret[0].(*ecr.UploadLayerPartOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockECRAPIRecorder) UploadLayerPartWithContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "UploadLayerPartWithContext", _s...)
 }

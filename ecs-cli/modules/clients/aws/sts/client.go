@@ -14,7 +14,7 @@
 package sts
 
 import (
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/clients"
 	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/config"
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,17 +31,17 @@ type Client interface {
 // stsClient implements Client
 type stsClient struct {
 	client stsiface.STSAPI
-	params *config.CliParams
+	params *config.CLIParams
 }
 
 // NewClient Creates a new sts client
-func NewClient(params *config.CliParams) Client {
+func NewClient(params *config.CLIParams) Client {
 	client := sts.New(session.New(params.Session.Config))
 	client.Handlers.Build.PushBackNamed(clients.CustomUserAgentHandler())
 	return newClient(params, client)
 }
 
-func newClient(params *config.CliParams, client stsiface.STSAPI) Client {
+func newClient(params *config.CLIParams, client stsiface.STSAPI) Client {
 	return &stsClient{
 		client: client,
 		params: params,

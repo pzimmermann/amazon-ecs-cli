@@ -14,14 +14,14 @@
 package app
 
 import (
-	log "github.com/Sirupsen/logrus"
-	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands"
+	log "github.com/sirupsen/logrus"
+	"github.com/aws/amazon-ecs-cli/ecs-cli/modules/commands/flags"
 	"github.com/urfave/cli"
 )
 
 // BeforeApp is an action that is executed before any cli command.
 func BeforeApp(c *cli.Context) error {
-	if c.GlobalBool(command.VerboseFlag) || c.Bool(command.VerboseFlag) {
+	if c.GlobalBool(flags.VerboseFlag) || c.Bool(flags.VerboseFlag) {
 		log.SetLevel(log.DebugLevel)
 	}
 	return nil

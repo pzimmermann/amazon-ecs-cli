@@ -1,5 +1,92 @@
 # Changelog
 
+## 1.4.1
+* Bug - Ensure tests pass on go 1.10
+* Enhancement - Support longer resource IDs in Cloudformation template
+
+## 1.4.0
+* Feature - Update AMI to amzn-ami-2017.09.j-amazon-ecs-optimized
+* Feature - Add force-deployment flag to compose service (#144)
+* Feature - Support aws_session token in ECS Profiles (#415)
+* Feature - Add support for us-gov-west-1
+* Bug - Fix YAML parse warnings on networks field (#237)
+* Enhancement - Add issue template
+
+## 1.3.0
+* Feature - Update AMI to amzn-ami-2017.09.g-amazon-ecs-optimized
+* Feature - Add health-check-grace-period flag for compose service up
+* Feature - Add empty flag for cluster up
+
+## 1.2.2
+* Feature - Update AMI to amzn-ami-2017.09.f-amazon-ecs-optimized
+
+## 1.2.1
+* Feature - Update AMI to amzn-ami-2017.09.e-amazon-ecs-optimized
+
+## 1.2.0
+* Feature - Added `--create-log-groups` flag to create the CloudWatch log groups specified in your compose file. #389
+* Feature - Add support for region ap-south-1, sa-east-1, and eu-west-3
+* Enhancement - Update CloudFormation template with all available instance types #379
+* Enhancement - Make `ecs-cli scale` compatible with CloudFormation Templates created by the ECS Console #390
+* Bug - Fixed `ecs-cli up` with EC2 Launch Type and a custom instance role #394
+* Bug - Make `ecs-cli scale` compatible with CloudFormation templates created by older version of the ECS CLI #330
+
+## 1.1.0
+* Feature - Add support for Task Networking
+* Feature - Add support for AWS Fargate
+* Feature - Add support for viewing Cloudwatch logs of an ECS task
+* Enhancement - Added Amazon Open Source Code of Conduct
+* Bug - Fix credential resolution using aws-profile #369
+
+## 1.0.0
+* Feature - Add support for configuring multiple named ECS Profiles and Cluster Configurations #364
+* Feature - Update the Order of Resolution for Credentials and Region #351
+* Feature - Add support for Task Role Arn, Essential, and Network Mode with the —ecs-params flag #328
+* Feature - Add support for running the ECS CLI on Windows #354
+* Enhancement - Make keypair optional in `ecs-cli up` command #347
+* Enhancement - Update CloudFormation template with all available instance types #340
+* Bug - Change default cluster MinSize to 0 #336
+
+## 0.6.6
+* Feature - Add support for region ap-northeast-2
+
+## 0.6.5
+* Feature - Add support for cap_add and cap_drop
+* Feature - Update AMI to amzn-ami-2017.03.g-amazon-ecs-optimized
+* Enhancement - PS command displays private IPs when instance lacks a Public IP
+* Bug - All commands now return an error exit code for error cases #306
+
+## 0.6.4
+* Feature - Update AMI to amzn-ami-2017.03.f-amazon-ecs-optimized
+
+## 0.6.3
+* Feature - Update AMI to amzn-ami-2017.03.e-amazon-ecs-optimized
+* Feature - Support configurable timeout using new `--timeout` flag in `ecs-cli compose service` commands.
+* Enhancement - Print service events when `ecs-cli compose service up` is run
+* Feature - Support custom instance role by `--instance-role` flag in `ecs-cli up` command.
+
+
+## 0.6.2
+* Enhancement - Support region cn-north-1
+
+## 0.6.1
+* Enhancement - Support multiple compose files in compose commands
+* Enhancement - Support `docker-compose.override.yml` with compose commands
+* Bug - `--cluster` and `--region` flags can be specified both before and after compose and compose service subcommands
+
+## 0.6.0
+* Feature - Update ami to amzn-ami-2017.03.c-amazon-ecs-optimized
+* Feature - Support cluster and region runtime flag for all ECS commands
+* Feature - Support `--task-role-arn` in compose commands
+* Feature - Support memory reservation in compose
+* Feature - `ecs-cli up` without auto-assigned IP address
+* Enhancement - Support Multiple Security Groups in the `ecs-cli up`
+* Enhancement - Support `ecs-cli compose run` with multiple containers and run command overrides
+* Enhancement - Support additional instance types p2, g2, and x1
+* Bug - Avoid SIGSEGV error when ec2InstanceID does not exist #231
+* Bug - Allow dashes “-“ in `ecs-cli push` #238
+* Bug - Allow `ecs-cli compose up` to have project name longer than 36 characters #97
+
 ## 0.5.0
 * Feature - Support ECR push, pull, and list images
 * Feature - Support existing ELB/ALB in CreateService

@@ -1,5 +1,7 @@
+ecs-cli/_vendor-*
 ecs-cli/out/
 bin/
 *.swp
 *.orig
 ecs-cli/vendor/pkg
+.vscode/*
